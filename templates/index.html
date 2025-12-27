@@ -1,375 +1,350 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>AI DOMINATOR | TikTok-First API Console</title>
-  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AI DOMINATOR — API Console</title>
   <style>
-    :root { --blue:#00f2ff; --red:#ff0055; --bg:#050505; --card:rgba(255,255,255,0.03); --stroke:rgba(255,255,255,0.12); }
-    body { background:var(--bg); color:#fff; font-family:'Cairo',sans-serif; margin:0; padding:18px; }
-    h1,h2 { margin:0 0 14px 0; }
-    a { color: var(--blue); text-decoration: none; }
-    .grid { display:grid; grid-template-columns: 420px 1fr; gap: 16px; align-items:start; }
-    .card { background:var(--card); border:1px solid var(--stroke); border-radius:18px; padding:18px; }
-    .btn { width:100%; border:0; border-radius:12px; padding:12px 14px; font-weight:900; cursor:pointer; font-size:15px; }
-    .btn.blue { background:var(--blue); color:#000; }
-    .btn.red { background:var(--red); color:#fff; }
-    .btn.ghost { background:transparent; border:1px solid rgba(255,255,255,0.25); color:#fff; }
-    label { display:block; font-size:12px; opacity:.85; margin:10px 0 6px; }
+    :root { --bg:#0b0f17; --panel:#111827; --muted:#9ca3af; --text:#e5e7eb; --line:#1f2937; --btn:#2563eb; --btn2:#16a34a; --err:#ef4444; }
+    body { margin:0; font-family: system-ui, -apple-system, "Segoe UI", Arial; background:var(--bg); color:var(--text); }
+    header { padding:16px 18px; border-bottom:1px solid var(--line); background:rgba(17,24,39,.6); backdrop-filter: blur(6px); position:sticky; top:0; }
+    h1 { margin:0; font-size:16px; }
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 16px; display:grid; gap: 14px; }
+    .grid { display:grid; grid-template-columns: 1fr; gap: 14px; }
+    @media (min-width: 980px){ .grid { grid-template-columns: 1fr 1fr; } }
+    .card { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:14px; }
+    .card h2 { margin:0 0 10px; font-size:14px; }
+    label { display:block; font-size:12px; color:var(--muted); margin:10px 0 6px; }
     input, textarea, select {
-      width:100%; box-sizing:border-box;
-      background:#000; border:1px solid rgba(255,255,255,0.2);
-      color:#fff; border-radius:12px; padding:10px 12px;
-      font-family: inherit;
+      width:100%; box-sizing:border-box; border-radius:10px; border:1px solid var(--line);
+      background:#0f172a; color:var(--text); padding:10px; outline:none;
     }
-    textarea { min-height: 78px; resize: vertical; }
-    .row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-    .pill { display:inline-block; padding:6px 10px; border:1px solid rgba(255,255,255,0.22); border-radius:999px; font-size:12px; opacity:.9; }
-    .status { margin-top:10px; font-size:12px; opacity:.9; }
+    textarea { min-height: 90px; resize: vertical; }
+    .row { display:grid; grid-template-columns: 1fr; gap:10px; }
+    @media (min-width: 640px){ .row { grid-template-columns: 1fr 1fr; } }
+    .btns { display:flex; gap:10px; flex-wrap: wrap; margin-top: 12px; }
+    button {
+      border:none; border-radius:10px; padding:10px 12px; cursor:pointer; font-weight:600;
+      background:var(--btn); color:white;
+    }
+    button.secondary { background:#334155; }
+    button.success { background:var(--btn2); }
+    .hint { font-size:12px; color:var(--muted); line-height: 1.5; }
     pre {
-      background:#000; border:1px solid rgba(255,255,255,0.18);
-      border-radius:14px; padding:12px; overflow:auto; max-height: 62vh;
-      white-space: pre-wrap;
+      background:#0a1224; border:1px solid var(--line); border-radius:14px;
+      padding:12px; overflow:auto; max-height: 340px;
     }
-    .ideas { display:grid; gap:10px; margin-top:10px; }
-    .idea { border:1px solid rgba(255,255,255,0.14); border-radius:14px; padding:12px; background:rgba(255,255,255,0.02); }
-    .idea b { color: var(--blue); }
-    .mini { font-size:12px; opacity:.9; }
-    .topbar { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:14px; padding-bottom:12px; border-bottom:1px solid rgba(255,255,255,0.12);}
+    .status { display:flex; align-items:center; gap:10px; font-size:12px; color:var(--muted); }
+    .dot { width:10px; height:10px; border-radius:99px; background:#64748b; display:inline-block; }
+    .dot.ok { background:#22c55e; }
+    .dot.bad { background:#ef4444; }
+    .warn { color:#f59e0b; }
+    .err { color:var(--err); }
+    .small { font-size:12px; }
+    code { color:#a7f3d0; }
   </style>
 </head>
 <body>
-  <div class="topbar">
-    <div>
-      <h1>AI DOMINATOR</h1>
-      <div class="pill">TikTok-First API Console</div>
+<header>
+  <div class="wrap" style="padding:0 16px;">
+    <h1>AI DOMINATOR — API Console (Browser)</h1>
+    <div class="status">
+      <span id="dot" class="dot"></span>
+      <span id="svc">Checking service…</span>
+      <span class="small">Base: <code id="base"></code></span>
     </div>
-    <div style="text-align:left;">
-      <div class="mini">JSON debug: <a href="/api" target="_blank">/api</a></div>
-      <div class="mini">Health: <a href="/health" target="_blank">/health</a></div>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="card">
+    <div class="hint">
+      هذه الصفحة تسمح لك بتنفيذ <b>POST</b> من المتصفح مباشرة (Fetch)، بدون Postman / curl.
+      <br/>
+      <span class="warn">ملاحظة مهمة:</span> إذا عملت redeploy على Render بدون “Persistent Disk”، قاعدة البيانات قد تُمسح وتحتاج تعمل <b>Onboard</b> من جديد للحصول على <b>creator_id</b> جديد.
     </div>
   </div>
 
   <div class="grid">
-    <!-- LEFT: Controls -->
+    <!-- Onboard -->
     <div class="card">
-      <h2>1) Onboard (إنشاء/تحديث Creator)</h2>
-
-      <label>creator_id (اختياري — إذا عندك قديم ضعه هنا للحفاظ عليه)</label>
-      <input id="creatorId" placeholder="سيُحفظ تلقائيًا بعد أول Onboard"/>
-
-      <label>display_name</label>
-      <input id="displayName" value="Mohammad"/>
+      <h2>1) Onboard — POST /v1/onboard</h2>
 
       <div class="row">
         <div>
+          <label>display_name</label>
+          <input id="display_name" value="Mohammad" />
+        </div>
+        <div>
           <label>goal</label>
-          <select id="goal">
-            <option value="followers" selected>followers</option>
-            <option value="sales">sales</option>
-            <option value="leads">leads</option>
+          <input id="goal" value="followers" />
+        </div>
+      </div>
+
+      <label>primary_niche</label>
+      <input id="primary_niche" value="التسويق الرقمي" />
+
+      <label>sub_niches (افصل بفاصلة)</label>
+      <input id="sub_niches" value="TikTok, Branding, AI" />
+
+      <div class="row">
+        <div>
+          <label>language</label>
+          <select id="language">
+            <option value="ar" selected>ar</option>
+            <option value="en">en</option>
           </select>
         </div>
         <div>
           <label>tone</label>
           <select id="tone">
             <option value="educational" selected>educational</option>
-            <option value="bold">bold</option>
-            <option value="friendly">friendly</option>
+            <option value="casual">casual</option>
+            <option value="storytelling">storytelling</option>
+            <option value="authoritative">authoritative</option>
           </select>
         </div>
       </div>
 
-      <label>primary_niche</label>
-      <input id="primaryNiche" value="التسويق الرقمي"/>
+      <label>constraints (JSON اختياري)</label>
+      <textarea id="constraints">{}</textarea>
 
-      <label>sub_niches (افصل بفواصل)</label>
-      <input id="subNiches" value="TikTok,Branding,AI"/>
+      <div class="btns">
+        <button class="success" onclick="doOnboard()">Run Onboard</button>
+        <button class="secondary" onclick="copyCreatorId()">Copy creator_id</button>
+      </div>
 
-      <label>language</label>
-      <select id="language">
-        <option value="ar" selected>ar</option>
-        <option value="en">en</option>
-      </select>
+      <label>Response</label>
+      <pre id="out_onboard">{}</pre>
+    </div>
 
-      <button class="btn red" onclick="onboard()">Onboard / Update</button>
-      <button class="btn ghost" style="margin-top:10px;" onclick="clearLocal()">مسح البيانات المحلية</button>
+    <!-- Build Pack -->
+    <div class="card">
+      <h2>2) Build Pack — POST /v1/build-pack</h2>
 
-      <div class="status" id="onboardStatus"></div>
+      <label>creator_id</label>
+      <input id="creator_id" placeholder="سيتم تعبئته تلقائيًا بعد Onboard" />
 
-      <hr style="border:0; border-top:1px solid rgba(255,255,255,0.12); margin:16px 0;">
-
-      <h2>2) Daily Brief</h2>
-      <label>extra_context (اختياري)</label>
-      <textarea id="extraContext" placeholder="أي سياق إضافي يساعد في توليد الأفكار..."></textarea>
-
-      <label>competitor_urls (كل سطر رابط)</label>
-      <textarea id="competitorUrls" placeholder="https://...\nhttps://..."></textarea>
-
-      <button class="btn blue" onclick="dailyBrief()">Generate Ideas</button>
-      <div class="status" id="briefStatus"></div>
-
-      <hr style="border:0; border-top:1px solid rgba(255,255,255,0.12); margin:16px 0;">
-
-      <h2>3) Build Pack</h2>
       <label>idea_title</label>
-      <input id="ideaTitle" placeholder="سيتعبأ تلقائيًا من الأفكار أو اكتب يدويًا"/>
+      <input id="idea_title" value="3 خطوات سريعة لتحسين نتائجك في التسويق الرقمي" />
 
       <label>angle</label>
-      <input id="angle" placeholder="مثال: قائمة خطوات قابلة للحفظ"/>
+      <input id="angle" value="قائمة خطوات قابلة للحفظ" />
 
       <label>value_promise</label>
-      <input id="valuePromise" placeholder="مثال: خطة بسيطة: نفّذ، قِس، عدّل."/>
+      <input id="value_promise" value="خطة بسيطة: نفّذ، قِس، عدّل." />
 
       <div class="row">
         <div>
           <label>preferred_length_sec</label>
-          <input id="lenSec" type="number" value="28"/>
+          <input id="preferred_length_sec" type="number" value="28" />
         </div>
         <div>
           <label>mode</label>
           <select id="mode">
             <option value="both" selected>both</option>
-            <option value="kit">kit</option>
-            <option value="prompt_pack">prompt_pack</option>
+            <option value="manual">manual</option>
+            <option value="ready">ready</option>
           </select>
         </div>
       </div>
 
-      <button class="btn red" onclick="buildPack()">Build Pack Now</button>
-      <div class="status" id="packStatus"></div>
-
-      <hr style="border:0; border-top:1px solid rgba(255,255,255,0.12); margin:16px 0;">
-
-      <h2>4) Report</h2>
-      <label>experiment_id</label>
-      <input id="experimentId" placeholder="سيُعبأ تلقائيًا بعد build-pack"/>
-
-      <button class="btn blue" onclick="getReport()">Get Report</button>
-      <div class="status" id="reportStatus"></div>
-    </div>
-
-    <!-- RIGHT: Output -->
-    <div class="card">
-      <h2>Output</h2>
-      <div class="mini">ملاحظة: فتح الرابط في المتصفح يُظهر هذه الواجهة، والـPOST يتم عبر الأزرار.</div>
-
-      <div id="ideasBox" class="ideas"></div>
-
-      <div style="display:flex; gap:10px; margin:12px 0;">
-        <button class="btn ghost" style="width:auto;" onclick="copyOut()">نسخ الناتج</button>
-        <button class="btn ghost" style="width:auto;" onclick="clearOut()">مسح الناتج</button>
+      <div class="btns">
+        <button class="success" onclick="doBuildPack()">Run Build Pack</button>
       </div>
 
-      <pre id="out">{}</pre>
+      <label>Response</label>
+      <pre id="out_buildpack">{}</pre>
+    </div>
+
+    <!-- Daily Brief -->
+    <div class="card">
+      <h2>3) Daily Brief — POST /v1/daily-brief</h2>
+
+      <label>creator_id</label>
+      <input id="creator_id2" />
+
+      <label>competitor_urls (سطر لكل رابط)</label>
+      <textarea id="competitor_urls"></textarea>
+
+      <label>extra_context</label>
+      <textarea id="extra_context" placeholder="أي سياق إضافي…"></textarea>
+
+      <div class="btns">
+        <button class="success" onclick="doDailyBrief()">Run Daily Brief</button>
+      </div>
+
+      <label>Response</label>
+      <pre id="out_dailybrief">{}</pre>
+    </div>
+
+    <!-- Report -->
+    <div class="card">
+      <h2>4) Report — GET /v1/report/&lt;experiment_id&gt;?creator_id=...</h2>
+
+      <label>creator_id</label>
+      <input id="creator_id3" />
+
+      <label>experiment_id</label>
+      <input id="experiment_id" placeholder="سيظهر في نتيجة build-pack" />
+
+      <div class="btns">
+        <button class="success" onclick="doReport()">Get Report</button>
+      </div>
+
+      <label>Response</label>
+      <pre id="out_report">{}</pre>
     </div>
   </div>
 
-  <script>
-    const outEl = document.getElementById('out');
+  <div class="card">
+    <h2>ملاحظات تشغيل سريعة</h2>
+    <div class="hint">
+      <ol>
+        <li>افتح رابطك الرئيسي: <code>https://dominatorv2.onrender.com/</code></li>
+        <li>اضغط <b>Run Onboard</b> لتحصل على <code>creator_id</code></li>
+        <li>اضغط <b>Run Build Pack</b> (سيستعمل creator_id تلقائيًا)</li>
+        <li>إذا ظهر لك خطأ <span class="err">creator_id غير موجود</span> بعد Redeploy: هذا يعني قاعدة البيانات انمسحت — أعد Onboard.</li>
+      </ol>
+    </div>
+  </div>
+</div>
 
-    function setOut(obj) {
-      outEl.textContent = JSON.stringify(obj, null, 2);
+<script>
+  const base = window.location.origin;
+  document.getElementById("base").textContent = base;
+
+  function pretty(x){ return JSON.stringify(x, null, 2); }
+  function setOut(id, obj){ document.getElementById(id).textContent = typeof obj === "string" ? obj : pretty(obj); }
+
+  async function check() {
+    try {
+      const r = await fetch(base + "/health");
+      const j = await r.json();
+      document.getElementById("dot").className = "dot ok";
+      document.getElementById("svc").textContent = `OK — ${j.service}`;
+    } catch (e) {
+      document.getElementById("dot").className = "dot bad";
+      document.getElementById("svc").textContent = "Service unreachable";
     }
+  }
+  check();
 
-    function loadLocal() {
-      const cid = localStorage.getItem('dominator_creator_id') || '';
-      if (cid) document.getElementById('creatorId').value = cid;
+  function hydrateCreatorId(id) {
+    if (!id) return;
+    document.getElementById("creator_id").value = id;
+    document.getElementById("creator_id2").value = id;
+    document.getElementById("creator_id3").value = id;
+    localStorage.setItem("creator_id", id);
+  }
 
-      const exp = localStorage.getItem('dominator_experiment_id') || '';
-      if (exp) document.getElementById('experimentId').value = exp;
+  // load saved creator_id
+  hydrateCreatorId(localStorage.getItem("creator_id"));
+
+  async function postJSON(path, body) {
+    const r = await fetch(base + path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json; charset=utf-8" },
+      body: JSON.stringify(body)
+    });
+    const text = await r.text();
+    let data;
+    try { data = JSON.parse(text); } catch { data = text; }
+    return { ok: r.ok, status: r.status, data };
+  }
+
+  async function getJSON(path) {
+    const r = await fetch(base + path);
+    const text = await r.text();
+    let data;
+    try { data = JSON.parse(text); } catch { data = text; }
+    return { ok: r.ok, status: r.status, data };
+  }
+
+  async function doOnboard(){
+    const sub = (document.getElementById("sub_niches").value || "")
+      .split(",").map(s => s.trim()).filter(Boolean);
+
+    let constraints = {};
+    try { constraints = JSON.parse(document.getElementById("constraints").value || "{}"); }
+    catch { constraints = {}; }
+
+    const body = {
+      display_name: document.getElementById("display_name").value,
+      goal: document.getElementById("goal").value,
+      primary_niche: document.getElementById("primary_niche").value,
+      sub_niches: sub,
+      language: document.getElementById("language").value,
+      tone: document.getElementById("tone").value,
+      constraints,
+      tiktok_profile_url: null,
+      top_video_urls: [],
+      weak_video_urls: [],
+      past_scripts: []
+    };
+
+    const res = await postJSON("/v1/onboard", body);
+    setOut("out_onboard", res);
+
+    if (res.ok && res.data && res.data.creator_id) {
+      hydrateCreatorId(res.data.creator_id);
     }
+  }
 
-    function clearLocal() {
-      localStorage.removeItem('dominator_creator_id');
-      localStorage.removeItem('dominator_experiment_id');
-      document.getElementById('creatorId').value = '';
-      document.getElementById('experimentId').value = '';
-      document.getElementById('onboardStatus').textContent = 'تم مسح البيانات المحلية.';
+  async function doBuildPack(){
+    const body = {
+      creator_id: document.getElementById("creator_id").value.trim(),
+      idea_title: document.getElementById("idea_title").value,
+      angle: document.getElementById("angle").value,
+      value_promise: document.getElementById("value_promise").value,
+      preferred_length_sec: Number(document.getElementById("preferred_length_sec").value || 28),
+      mode: document.getElementById("mode").value
+    };
+
+    const res = await postJSON("/v1/build-pack", body);
+    setOut("out_buildpack", res);
+
+    // auto-fill experiment_id if present
+    if (res.ok && res.data && res.data.experiment_id) {
+      document.getElementById("experiment_id").value = res.data.experiment_id;
     }
+  }
 
-    async function postJson(path, body) {
-      const res = await fetch(path, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json; charset=utf-8' },
-        body: JSON.stringify(body)
-      });
-      const txt = await res.text();
-      let data = null;
-      try { data = JSON.parse(txt); } catch (e) { data = { raw: txt }; }
-      if (!res.ok) {
-        const msg = (data && (data.error || data.message)) ? (data.error || data.message) : ('HTTP ' + res.status);
-        throw new Error(msg);
-      }
-      return data;
+  async function doDailyBrief(){
+    const urls = (document.getElementById("competitor_urls").value || "")
+      .split("\n").map(s => s.trim()).filter(Boolean);
+
+    const body = {
+      creator_id: document.getElementById("creator_id2").value.trim(),
+      competitor_urls: urls,
+      extra_context: document.getElementById("extra_context").value || ""
+    };
+
+    const res = await postJSON("/v1/daily-brief", body);
+    setOut("out_dailybrief", res);
+  }
+
+  async function doReport(){
+    const cid = document.getElementById("creator_id3").value.trim();
+    const eid = document.getElementById("experiment_id").value.trim();
+    if (!cid || !eid) {
+      setOut("out_report", { ok:false, status: 0, data: { error: "ضع creator_id و experiment_id" } });
+      return;
     }
+    const res = await getJSON(`/v1/report/${encodeURIComponent(eid)}?creator_id=${encodeURIComponent(cid)}`);
+    setOut("out_report", res);
+  }
 
-    function mustCreatorId() {
-      const cid = (document.getElementById('creatorId').value || '').trim();
-      if (!cid) throw new Error('نفّذ Onboard أولاً للحصول على creator_id');
-      return cid;
+  async function copyCreatorId(){
+    const id = document.getElementById("creator_id").value.trim();
+    if (!id) return;
+    try {
+      await navigator.clipboard.writeText(id);
+      alert("تم نسخ creator_id");
+    } catch {
+      alert("لم أستطع النسخ تلقائيًا. انسخه يدويًا.");
     }
-
-    async function onboard() {
-      const st = document.getElementById('onboardStatus');
-      st.textContent = '... جاري التنفيذ';
-      try {
-        const cid = (document.getElementById('creatorId').value || '').trim() || null;
-
-        const payload = {
-          creator_id: cid,
-          display_name: document.getElementById('displayName').value,
-          goal: document.getElementById('goal').value,
-          primary_niche: document.getElementById('primaryNiche').value,
-          sub_niches: (document.getElementById('subNiches').value || '')
-            .split(',').map(s => s.trim()).filter(Boolean),
-          language: document.getElementById('language').value,
-          tone: document.getElementById('tone').value,
-          constraints: {},
-          tiktok_profile_url: null
-        };
-
-        const data = await postJson('/v1/onboard', payload);
-
-        document.getElementById('creatorId').value = data.creator_id;
-        localStorage.setItem('dominator_creator_id', data.creator_id);
-
-        st.textContent = '✅ ' + (data.message || 'OK') + ' | creator_id محفوظ.';
-        setOut(data);
-      } catch (e) {
-        st.textContent = '❌ ' + e.message;
-      }
-    }
-
-    async function dailyBrief() {
-      const st = document.getElementById('briefStatus');
-      const ideasBox = document.getElementById('ideasBox');
-      ideasBox.innerHTML = '';
-      st.textContent = '... جاري توليد الأفكار';
-
-      try {
-        const cid = mustCreatorId();
-        const competitor_urls = (document.getElementById('competitorUrls').value || '')
-          .split('\n').map(s => s.trim()).filter(Boolean);
-
-        const payload = {
-          creator_id: cid,
-          competitor_urls,
-          extra_context: document.getElementById('extraContext').value || ''
-        };
-
-        const data = await postJson('/v1/daily-brief', payload);
-        setOut(data);
-
-        const ideas = data.ideas || [];
-        if (!ideas.length) {
-          st.textContent = '✅ تم التنفيذ، لكن لا توجد أفكار.';
-          return;
-        }
-
-        st.textContent = '✅ تم توليد ' + ideas.length + ' فكرة. اختر واحدة لبناء Pack.';
-        ideas.forEach((idea, idx) => {
-          const div = document.createElement('div');
-          div.className = 'idea';
-          div.innerHTML = `
-            <div class="mini">#${idx+1} — <b>${escapeHtml(idea.title || '')}</b></div>
-            <div class="mini">Angle: ${escapeHtml(idea.angle || '')}</div>
-            <div class="mini">Value: ${escapeHtml(idea.value_promise || '')}</div>
-            <div style="display:flex; gap:10px; margin-top:10px;">
-              <button class="btn red" style="width:auto;" onclick='useIdea(${idx})'>استخدام وبناء Pack</button>
-              <button class="btn ghost" style="width:auto;" onclick='copyText(${JSON.stringify(idea.title || "")})'>نسخ العنوان</button>
-            </div>
-          `;
-          ideasBox.appendChild(div);
-        });
-
-        window.__lastIdeas = ideas;
-      } catch (e) {
-        st.textContent = '❌ ' + e.message;
-      }
-    }
-
-    function useIdea(i) {
-      const ideas = window.__lastIdeas || [];
-      const idea = ideas[i];
-      if (!idea) return;
-
-      document.getElementById('ideaTitle').value = idea.title || '';
-      document.getElementById('angle').value = idea.angle || '';
-      document.getElementById('valuePromise').value = idea.value_promise || '';
-      buildPack();
-    }
-
-    async function buildPack() {
-      const st = document.getElementById('packStatus');
-      st.textContent = '... جاري بناء الحزمة';
-
-      try {
-        const cid = mustCreatorId();
-        const payload = {
-          creator_id: cid,
-          idea_title: document.getElementById('ideaTitle').value,
-          angle: document.getElementById('angle').value,
-          value_promise: document.getElementById('valuePromise').value,
-          preferred_length_sec: Number(document.getElementById('lenSec').value || 28),
-          mode: document.getElementById('mode').value
-        };
-
-        const data = await postJson('/v1/build-pack', payload);
-        setOut(data);
-
-        if (data.experiment_id) {
-          document.getElementById('experimentId').value = data.experiment_id;
-          localStorage.setItem('dominator_experiment_id', data.experiment_id);
-        }
-
-        st.textContent = '✅ تم بناء الحزمة. experiment_id محفوظ.';
-      } catch (e) {
-        st.textContent = '❌ ' + e.message + ' (إذا ظهر "creator_id غير موجود" نفّذ Onboard من جديد)';
-      }
-    }
-
-    async function getReport() {
-      const st = document.getElementById('reportStatus');
-      st.textContent = '... جاري جلب التقرير';
-      try {
-        const cid = mustCreatorId();
-        const expId = (document.getElementById('experimentId').value || '').trim();
-        if (!expId) throw new Error('experiment_id مطلوب');
-
-        const res = await fetch(`/v1/report/${encodeURIComponent(expId)}?creator_id=${encodeURIComponent(cid)}`);
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
-        setOut(data);
-        st.textContent = '✅ تم جلب التقرير.';
-      } catch (e) {
-        st.textContent = '❌ ' + e.message;
-      }
-    }
-
-    function copyOut() {
-      navigator.clipboard.writeText(outEl.textContent || '{}');
-      alert('تم النسخ');
-    }
-
-    function clearOut() {
-      setOut({});
-      document.getElementById('ideasBox').innerHTML = '';
-    }
-
-    function copyText(t) {
-      navigator.clipboard.writeText(t || '');
-      alert('تم النسخ');
-    }
-
-    function escapeHtml(s) {
-      return String(s).replace(/[&<>"']/g, m => ({
-        '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'
-      }[m]));
-    }
-
-    loadLocal();
-  </script>
+  }
+</script>
 </body>
 </html>
