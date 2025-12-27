@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime
 from typing import Any, Dict, Optional
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_from_directory
 
 # Optional: Flask-Cors (installed in your requirements)
 try:
@@ -23,6 +23,7 @@ from services.artifacts import (
 
 APP_NAME = "AI_DOMINATOR_TikTok_First"
 DB_PATH = os.getenv("DOMINATOR_DB_PATH", "dominator.db")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 def _now_iso() -> str:
@@ -181,7 +182,6 @@ def _fetch_metrics(experiment_id: str, creator_id: str) -> list[dict]:
 
 
 def _compute_point_scores(point: dict) -> dict:
-    # safe numeric parsing
     views = max(int(point.get("views", 0) or 0), 0)
     likes = max(int(point.get("likes", 0) or 0), 0)
     comments = max(int(point.get("comments", 0) or 0), 0)
@@ -193,8 +193,6 @@ def _compute_point_scores(point: dict) -> dict:
     engagement_rate = (engagement / views) if views > 0 else 0.0
     shares_per_1k = (shares * 1000.0 / views) if views > 0 else 0.0
     comments_per_1k = (comments * 1000.0 / views) if views > 0 else 0.0
-
-    # proxy "velocity" score: views at early checkpoints
     views_velocity = float(views)
 
     return {
@@ -208,24 +206,16 @@ def _compute_point_scores(point: dict) -> dict:
 
 
 def _decide_winner(metrics_rows: list[dict]) -> dict:
-    """
-    MVP winner decision:
-    Phase 1: early growth (views_velocity + shares_per_1k)
-    Phase 2: quality (comments_per_1k + engagement_rate)
-    If both exist, phase2 has higher weight.
-    """
     by_variant: dict[str, list[dict]] = {}
     for r in metrics_rows:
         k = (r.get("variant_key") or "A").upper()
         by_variant.setdefault(k, []).append(r)
 
     def pick_row(rows: list[dict], preferred_labels: list[str]) -> Optional[dict]:
-        # find first matching t_label
         for label in preferred_labels:
             for rr in rows:
                 if (rr.get("t_label") or "") == label:
                     return rr
-        # fallback earliest
         return rows[0] if rows else None
 
     scoreboard = {}
@@ -236,16 +226,9 @@ def _decide_winner(metrics_rows: list[dict]) -> dict:
         early_c = (early or {}).get("computed") or {}
         late_c = (late or {}).get("computed") or {}
 
-        phase1 = (
-            float(early_c.get("views_velocity", 0.0))
-            + 300.0 * float(early_c.get("shares_per_1k_views", 0.0))
-        )
-        phase2 = (
-            200.0 * float(late_c.get("comments_per_1k_views", 0.0))
-            + 800.0 * float(late_c.get("engagement_rate", 0.0))
-        )
+        phase1 = float(early_c.get("views_velocity", 0.0)) + 300.0 * float(early_c.get("shares_per_1k_views", 0.0))
+        phase2 = 200.0 * float(late_c.get("comments_per_1k_views", 0.0)) + 800.0 * float(late_c.get("engagement_rate", 0.0))
 
-        # if late is missing, rely on phase1 only
         if late is None:
             total = phase1
             basis = "phase1_only"
@@ -268,7 +251,7 @@ def _decide_winner(metrics_rows: list[dict]) -> dict:
 
 
 app = Flask(__name__)
-app.json.ensure_ascii = False  # important for Arabic output
+app.json.ensure_ascii = False
 
 if CORS:
     CORS(app, resources={r"/*": {"origins": "*"}})
@@ -276,19 +259,26 @@ if CORS:
 _init_db()
 
 
-@app.get("/health")
-def health():
-    return jsonify({"status": "ok", "service": APP_NAME, "time": _now_iso()}), 200
-
-
+# -----------------------------
+# Browser UI routes
+# -----------------------------
 @app.get("/")
-def root():
+def ui_root():
+    # Serve the HTML UI so the service "works in the browser"
+    return send_from_directory(BASE_DIR, "index.html")
+
+
+@app.get("/api")
+def api_root():
+    # Keep a JSON entry point (useful for debugging)
     return jsonify(
         {
             "service": APP_NAME,
             "status": "ok",
             "endpoints": {
                 "health": "GET /health",
+                "ui": "GET /",
+                "api": "GET /api",
                 "onboard": "POST /v1/onboard",
                 "daily_brief": "POST /v1/daily-brief",
                 "build_pack": "POST /v1/build-pack",
@@ -299,10 +289,27 @@ def root():
     ), 200
 
 
+@app.get("/favicon.ico")
+def favicon():
+    # Avoid noisy 404s in browser console
+    return ("", 204)
+
+
+@app.get("/health")
+def health():
+    return jsonify({"status": "ok", "service": APP_NAME, "time": _now_iso()}), 200
+
+
+# -----------------------------
+# API routes
+# -----------------------------
 @app.post("/v1/onboard")
 def onboard():
     payload = request.get_json(silent=True) or {}
-    creator_id = str(uuid.uuid4())
+
+    # IMPORTANT: allow re-using creator_id (solves "creator_id غير موجود" after redeploy/reset)
+    provided_creator_id = (payload.get("creator_id") or "").strip()
+    creator_id = provided_creator_id if provided_creator_id else str(uuid.uuid4())
 
     display_name = payload.get("display_name", "Creator")
     goal = payload.get("goal", "followers")
@@ -313,48 +320,70 @@ def onboard():
     constraints = payload.get("constraints", {})
     tiktok_profile_url = payload.get("tiktok_profile_url", None)
 
-    # TikTok connect is optional: default manual
     mode_default = "manual"
 
     conn = _db()
     cur = conn.cursor()
-    cur.execute(
-        """
-        INSERT INTO creators (
-          creator_id, display_name, goal, primary_niche, sub_niches_json,
-          language, tone, constraints_json, tiktok_profile_url, mode_default, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            creator_id,
-            display_name,
-            goal,
-            primary_niche,
-            _json_dump(sub_niches),
-            language,
-            tone,
-            _json_dump(constraints),
-            tiktok_profile_url,
-            mode_default,
-            _now_iso(),
-        ),
-    )
+    cur.execute("SELECT creator_id FROM creators WHERE creator_id=?", (creator_id,))
+    exists = cur.fetchone() is not None
+
+    if exists:
+        cur.execute(
+            """
+            UPDATE creators
+            SET display_name=?, goal=?, primary_niche=?, sub_niches_json=?,
+                language=?, tone=?, constraints_json=?, tiktok_profile_url=?,
+                mode_default=?
+            WHERE creator_id=?
+            """,
+            (
+                display_name,
+                goal,
+                primary_niche,
+                _json_dump(sub_niches),
+                language,
+                tone,
+                _json_dump(constraints),
+                tiktok_profile_url,
+                mode_default,
+                creator_id,
+            ),
+        )
+        message = "تم تحديث ملفك بنجاح."
+    else:
+        cur.execute(
+            """
+            INSERT INTO creators (
+              creator_id, display_name, goal, primary_niche, sub_niches_json,
+              language, tone, constraints_json, tiktok_profile_url, mode_default, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                creator_id,
+                display_name,
+                goal,
+                primary_niche,
+                _json_dump(sub_niches),
+                language,
+                tone,
+                _json_dump(constraints),
+                tiktok_profile_url,
+                mode_default,
+                _now_iso(),
+            ),
+        )
+        message = "تم إنشاء ملفك بنجاح. الوضع الافتراضي: Manual (بدون ربط TikTok)."
+
     conn.commit()
     conn.close()
 
-    return jsonify(
-        {
-            "creator_id": creator_id,
-            "message": "تم إنشاء ملفك بنجاح. الوضع الافتراضي: Manual (بدون ربط TikTok).",
-            "mode_default": mode_default,
-        }
-    ), 200
+    return jsonify({"creator_id": creator_id, "message": message, "mode_default": mode_default}), 200
 
 
 @app.post("/v1/daily-brief")
 def daily_brief():
     payload = request.get_json(silent=True) or {}
-    creator_id = payload.get("creator_id")
+    creator_id = (payload.get("creator_id") or "").strip()
     if not creator_id:
         return jsonify({"error": "creator_id مطلوب"}), 400
 
@@ -379,7 +408,7 @@ def daily_brief():
 @app.post("/v1/build-pack")
 def build_pack():
     payload = request.get_json(silent=True) or {}
-    creator_id = payload.get("creator_id")
+    creator_id = (payload.get("creator_id") or "").strip()
     if not creator_id:
         return jsonify({"error": "creator_id مطلوب"}), 400
 
@@ -399,14 +428,9 @@ def build_pack():
     niche = creator.get("primary_niche", "التسويق الرقمي")
     variants = build_variants_for_idea(title=idea_title, angle=angle, niche=niche)
 
-    # predicted scores
     predicted_scores = {v["key"]: float(v["score"]) for v in variants}
-    predicted = {
-        "scores": predicted_scores,
-        "note": "اختبر Hooks A/B/C للحصول على دليل نتيجة (Lift).",
-    }
+    predicted = {"scores": predicted_scores, "note": "اختبر Hooks A/B/C للحصول على دليل نتيجة (Lift)."}
 
-    # blueprint + artifacts
     blueprint = build_blueprint(
         idea_title=idea_title,
         angle=angle,
@@ -414,26 +438,18 @@ def build_pack():
         video_seconds=preferred_length_sec,
     )
 
-    # choose default variant A for the ready-to-record kit (while still providing hooks A/B/C)
     vA = next((v for v in variants if v["key"] == "A"), variants[0])
 
     ready_kit_payload = render_ready_to_record_kit(
         blueprint=blueprint,
         selected_hook_text=vA["hook_text"],
         selected_onscreen_text=vA["onscreen_text"],
-        hooks_map={
-            v["key"]: {"hook_text": v["hook_text"], "onscreen_text": v["onscreen_text"]}
-            for v in variants
-        },
+        hooks_map={v["key"]: {"hook_text": v["hook_text"], "onscreen_text": v["onscreen_text"]} for v in variants},
         keywords=[niche, angle],
     )
 
     experiment_plan_payload = build_experiment_plan()
-    prompt_pack_payload = build_prompt_pack(
-        idea_title=idea_title,
-        angle=angle,
-        value_promise=value_promise,
-    )
+    prompt_pack_payload = build_prompt_pack(idea_title=idea_title, angle=angle, value_promise=value_promise)
 
     artifacts = []
     if mode in ("kit", "both"):
@@ -475,8 +491,8 @@ def build_pack():
 @app.post("/v1/submit-metrics")
 def submit_metrics():
     payload = request.get_json(silent=True) or {}
-    creator_id = payload.get("creator_id")
-    experiment_id = payload.get("experiment_id")
+    creator_id = (payload.get("creator_id") or "").strip()
+    experiment_id = (payload.get("experiment_id") or "").strip()
     variant_key = (payload.get("variant_key") or "A").strip().upper()
     point = payload.get("point") or {}
 
@@ -518,7 +534,7 @@ def submit_metrics():
 
 @app.get("/v1/report/<experiment_id>")
 def report(experiment_id: str):
-    creator_id = request.args.get("creator_id", "").strip()
+    creator_id = (request.args.get("creator_id", "") or "").strip()
     if not creator_id:
         return jsonify({"error": "creator_id مطلوب في query string"}), 400
 
@@ -533,7 +549,6 @@ def report(experiment_id: str):
     rows = _fetch_metrics(experiment_id=experiment_id, creator_id=creator_id)
     decision = _decide_winner(rows)
 
-    # summary by variant
     summary = {}
     for r in rows:
         k = (r.get("variant_key") or "A").upper()
