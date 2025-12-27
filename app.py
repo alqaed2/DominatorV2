@@ -1,389 +1,239 @@
-import json
 import os
-import sqlite3
+import json
 import uuid
+import time
+import sqlite3
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
 
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, request, jsonify, render_template
+from flask_cors import CORS
 
-# Optional: Flask-Cors (installed in your requirements)
-try:
-    from flask_cors import CORS
-except Exception:
-    CORS = None
-
+# ملاحظة: هذه imports موجودة في مشروعك (services/*). لا تحذفها.
 from services.generator import generate_daily_brief, build_variants_for_idea
-from services.artifacts import (
-    build_blueprint,
-    render_ready_to_record_kit,
-    build_experiment_plan,
-    build_prompt_pack,
-)
+from services.blueprint import build_blueprint
+from services.renderers import render_ready_to_record_kit, render_experiment_plan, render_prompt_pack
 
-APP_NAME = "AI_DOMINATOR_TikTok_First"
-DB_PATH = os.getenv("DOMINATOR_DB_PATH", "dominator.db")
+
+# ---------------------------------------
+# App
+# ---------------------------------------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.getenv("DB_PATH", os.path.join(BASE_DIR, "data.sqlite3"))
+
+# مهم: template_folder="templates" لأن index.html داخل templates/
+app = Flask(__name__, template_folder="templates")
+CORS(app)
 
 
-def _now_iso() -> str:
-    return datetime.utcnow().isoformat() + "Z"
+# ---------------------------------------
+# DB helpers
+# ---------------------------------------
+def _conn():
+    return sqlite3.connect(DB_PATH)
 
+def init_db():
+    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True) if os.path.dirname(DB_PATH) else None
+    with _conn() as con:
+        cur = con.cursor()
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS creators (
+                creator_id TEXT PRIMARY KEY,
+                payload_json TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS experiments (
+                experiment_id TEXT PRIMARY KEY,
+                creator_id TEXT NOT NULL,
+                payload_json TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS metrics (
+                id TEXT PRIMARY KEY,
+                experiment_id TEXT NOT NULL,
+                creator_id TEXT NOT NULL,
+                payload_json TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+        """)
+        con.commit()
 
-def _db() -> sqlite3.Connection:
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+def _now_iso():
+    return datetime.utcnow().isoformat()
 
-
-def _init_db() -> None:
-    conn = _db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        CREATE TABLE IF NOT EXISTS creators (
-            creator_id TEXT PRIMARY KEY,
-            display_name TEXT,
-            goal TEXT,
-            primary_niche TEXT,
-            sub_niches_json TEXT,
-            language TEXT,
-            tone TEXT,
-            constraints_json TEXT,
-            tiktok_profile_url TEXT,
-            mode_default TEXT,
-            created_at TEXT
+def _put_creator(creator_id: str, payload: Dict[str, Any]):
+    with _conn() as con:
+        cur = con.cursor()
+        cur.execute(
+            "INSERT OR REPLACE INTO creators (creator_id, payload_json, created_at) VALUES (?, ?, ?)",
+            (creator_id, json.dumps(payload, ensure_ascii=False), _now_iso()),
         )
-        """
-    )
-
-    cur.execute(
-        """
-        CREATE TABLE IF NOT EXISTS experiments (
-            experiment_id TEXT PRIMARY KEY,
-            creator_id TEXT,
-            idea_title TEXT,
-            angle TEXT,
-            value_promise TEXT,
-            preferred_length_sec INTEGER,
-            mode TEXT,
-            artifacts_json TEXT,
-            predicted_json TEXT,
-            created_at TEXT,
-            FOREIGN KEY(creator_id) REFERENCES creators(creator_id)
-        )
-        """
-    )
-
-    cur.execute(
-        """
-        CREATE TABLE IF NOT EXISTS metrics (
-            id TEXT PRIMARY KEY,
-            experiment_id TEXT,
-            creator_id TEXT,
-            variant_key TEXT,
-            t_label TEXT,
-            metrics_json TEXT,
-            computed_json TEXT,
-            created_at TEXT,
-            FOREIGN KEY(experiment_id) REFERENCES experiments(experiment_id),
-            FOREIGN KEY(creator_id) REFERENCES creators(creator_id)
-        )
-        """
-    )
-
-    conn.commit()
-    conn.close()
-
-
-def _json_load(s: Optional[str], default):
-    if not s:
-        return default
-    try:
-        return json.loads(s)
-    except Exception:
-        return default
-
-
-def _json_dump(obj: Any) -> str:
-    return json.dumps(obj, ensure_ascii=False, separators=(",", ":"))
-
+        con.commit()
 
 def _get_creator(creator_id: str) -> Optional[Dict[str, Any]]:
-    conn = _db()
-    cur = conn.cursor()
-    cur.execute("SELECT * FROM creators WHERE creator_id=?", (creator_id,))
-    row = cur.fetchone()
-    conn.close()
-    if not row:
-        return None
-    d = dict(row)
-    d["sub_niches"] = _json_load(d.get("sub_niches_json"), [])
-    d["constraints"] = _json_load(d.get("constraints_json"), {})
-    return d
+    with _conn() as con:
+        cur = con.cursor()
+        cur.execute("SELECT payload_json FROM creators WHERE creator_id = ?", (creator_id,))
+        row = cur.fetchone()
+        if not row:
+            return None
+        try:
+            return json.loads(row[0])
+        except Exception:
+            return None
 
+def _put_experiment(experiment_id: str, creator_id: str, payload: Dict[str, Any]):
+    with _conn() as con:
+        cur = con.cursor()
+        cur.execute(
+            "INSERT OR REPLACE INTO experiments (experiment_id, creator_id, payload_json, created_at) VALUES (?, ?, ?, ?)",
+            (experiment_id, creator_id, json.dumps(payload, ensure_ascii=False), _now_iso()),
+        )
+        con.commit()
 
 def _get_experiment(experiment_id: str) -> Optional[Dict[str, Any]]:
-    conn = _db()
-    cur = conn.cursor()
-    cur.execute("SELECT * FROM experiments WHERE experiment_id=?", (experiment_id,))
-    row = cur.fetchone()
-    conn.close()
-    if not row:
-        return None
-    d = dict(row)
-    d["artifacts"] = _json_load(d.get("artifacts_json"), [])
-    d["predicted"] = _json_load(d.get("predicted_json"), {})
-    return d
+    with _conn() as con:
+        cur = con.cursor()
+        cur.execute("SELECT payload_json FROM experiments WHERE experiment_id = ?", (experiment_id,))
+        row = cur.fetchone()
+        if not row:
+            return None
+        try:
+            return json.loads(row[0])
+        except Exception:
+            return None
+
+def _put_metrics(experiment_id: str, creator_id: str, payload: Dict[str, Any]):
+    with _conn() as con:
+        cur = con.cursor()
+        cur.execute(
+            "INSERT INTO metrics (id, experiment_id, creator_id, payload_json, created_at) VALUES (?, ?, ?, ?, ?)",
+            (str(uuid.uuid4()), experiment_id, creator_id, json.dumps(payload, ensure_ascii=False), _now_iso()),
+        )
+        con.commit()
+
+def _list_metrics(experiment_id: str, creator_id: str) -> List[Dict[str, Any]]:
+    with _conn() as con:
+        cur = con.cursor()
+        cur.execute(
+            "SELECT payload_json, created_at FROM metrics WHERE experiment_id = ? AND creator_id = ? ORDER BY created_at ASC",
+            (experiment_id, creator_id),
+        )
+        rows = cur.fetchall()
+        out = []
+        for (pj, created_at) in rows:
+            try:
+                out.append({"created_at": created_at, "payload": json.loads(pj)})
+            except Exception:
+                out.append({"created_at": created_at, "payload": pj})
+        return out
 
 
-def _insert_metric(experiment_id: str, creator_id: str, variant_key: str, t_label: str, metrics: dict, computed: dict) -> dict:
-    conn = _db()
-    cur = conn.cursor()
-    metric_id = str(uuid.uuid4())
-    cur.execute(
-        """
-        INSERT INTO metrics (id, experiment_id, creator_id, variant_key, t_label, metrics_json, computed_json, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            metric_id,
-            experiment_id,
-            creator_id,
-            variant_key,
-            t_label,
-            _json_dump(metrics),
-            _json_dump(computed),
-            _now_iso(),
-        ),
-    )
-    conn.commit()
-    conn.close()
-    return {"id": metric_id, "computed": computed}
+# ---------------------------------------
+# Health + Home
+# ---------------------------------------
+@app.get("/health")
+def health():
+    return jsonify({"status": "ok", "service": "AI_DOMINATOR_TikTok_First"}), 200
 
+@app.route("/", methods=["GET", "HEAD"])
+def home():
+    """
+    - المتصفح: يعرض صفحة HTML (لوحة تحكم) لتجربة الـAPI من داخل المتصفح.
+    - أي عميل غير متصفح/بدون text/html: يعرض JSON endpoints (كما كان سابقًا).
+    """
+    accept = (request.headers.get("Accept") or "").lower()
 
-def _fetch_metrics(experiment_id: str, creator_id: str) -> list[dict]:
-    conn = _db()
-    cur = conn.cursor()
-    cur.execute(
-        "SELECT * FROM metrics WHERE experiment_id=? AND creator_id=? ORDER BY created_at ASC",
-        (experiment_id, creator_id),
-    )
-    rows = cur.fetchall()
-    conn.close()
-    out = []
-    for r in rows:
-        d = dict(r)
-        d["metrics"] = _json_load(d.get("metrics_json"), {})
-        d["computed"] = _json_load(d.get("computed_json"), {})
-        out.append(d)
-    return out
+    # Render يعمل HEAD / للتأكد من الخدمة. نرجع 200 سريعًا.
+    if request.method == "HEAD":
+        return ("", 200)
 
+    if "text/html" in accept:
+        return render_template("index.html")
 
-def _compute_point_scores(point: dict) -> dict:
-    views = max(int(point.get("views", 0) or 0), 0)
-    likes = max(int(point.get("likes", 0) or 0), 0)
-    comments = max(int(point.get("comments", 0) or 0), 0)
-    shares = max(int(point.get("shares", 0) or 0), 0)
-    followers_gained = max(int(point.get("followers_gained", 0) or 0), 0)
-    profile_visits = max(int(point.get("profile_visits", 0) or 0), 0)
-
-    engagement = likes + comments + shares
-    engagement_rate = (engagement / views) if views > 0 else 0.0
-    shares_per_1k = (shares * 1000.0 / views) if views > 0 else 0.0
-    comments_per_1k = (comments * 1000.0 / views) if views > 0 else 0.0
-    views_velocity = float(views)
-
-    return {
-        "views_velocity": views_velocity,
-        "shares_per_1k_views": shares_per_1k,
-        "comments_per_1k_views": comments_per_1k,
-        "engagement_rate": engagement_rate,
-        "followers_gained": followers_gained,
-        "profile_visits": profile_visits,
-    }
-
-
-def _decide_winner(metrics_rows: list[dict]) -> dict:
-    by_variant: dict[str, list[dict]] = {}
-    for r in metrics_rows:
-        k = (r.get("variant_key") or "A").upper()
-        by_variant.setdefault(k, []).append(r)
-
-    def pick_row(rows: list[dict], preferred_labels: list[str]) -> Optional[dict]:
-        for label in preferred_labels:
-            for rr in rows:
-                if (rr.get("t_label") or "") == label:
-                    return rr
-        return rows[0] if rows else None
-
-    scoreboard = {}
-    for variant, rows in by_variant.items():
-        early = pick_row(rows, ["T+60m", "T+180m"])
-        late = pick_row(rows, ["T+24h", "T+48h"])
-
-        early_c = (early or {}).get("computed") or {}
-        late_c = (late or {}).get("computed") or {}
-
-        phase1 = float(early_c.get("views_velocity", 0.0)) + 300.0 * float(early_c.get("shares_per_1k_views", 0.0))
-        phase2 = 200.0 * float(late_c.get("comments_per_1k_views", 0.0)) + 800.0 * float(late_c.get("engagement_rate", 0.0))
-
-        if late is None:
-            total = phase1
-            basis = "phase1_only"
-        else:
-            total = (0.4 * phase1) + (0.6 * phase2)
-            basis = "phase1_phase2"
-
-        scoreboard[variant] = {
-            "basis": basis,
-            "phase1": phase1,
-            "phase2": phase2 if late is not None else None,
-            "total": total,
+    return jsonify({
+        "status": "ok",
+        "service": "AI_DOMINATOR_TikTok_First",
+        "endpoints": {
+            "onboard": "POST /v1/onboard",
+            "daily_brief": "POST /v1/daily-brief",
+            "build_pack": "POST /v1/build-pack",
+            "submit_metrics": "POST /v1/submit-metrics",
+            "report": "GET /v1/report/<experiment_id>?creator_id=...",
+            "health": "GET /health",
         }
-
-    if not scoreboard:
-        return {"winner": None, "scoreboard": {}}
-
-    winner = max(scoreboard.items(), key=lambda kv: kv[1]["total"])[0]
-    return {"winner": winner, "scoreboard": scoreboard}
-
-
-app = Flask(__name__)
-app.json.ensure_ascii = False
-
-if CORS:
-    CORS(app, resources={r"/*": {"origins": "*"}})
-
-_init_db()
-
-
-# -----------------------------
-# Browser UI routes
-# -----------------------------
-@app.get("/")
-def ui_root():
-    # Serve the HTML UI so the service "works in the browser"
-    return send_from_directory(BASE_DIR, "index.html")
-
-
-@app.get("/api")
-def api_root():
-    # Keep a JSON entry point (useful for debugging)
-    return jsonify(
-        {
-            "service": APP_NAME,
-            "status": "ok",
-            "endpoints": {
-                "health": "GET /health",
-                "ui": "GET /",
-                "api": "GET /api",
-                "onboard": "POST /v1/onboard",
-                "daily_brief": "POST /v1/daily-brief",
-                "build_pack": "POST /v1/build-pack",
-                "submit_metrics": "POST /v1/submit-metrics",
-                "report": "GET /v1/report/<experiment_id>?creator_id=...",
-            },
-        }
-    ), 200
-
+    }), 200
 
 @app.get("/favicon.ico")
 def favicon():
-    # Avoid noisy 404s in browser console
+    # لتجنّب 404 في Console
     return ("", 204)
 
 
-@app.get("/health")
-def health():
-    return jsonify({"status": "ok", "service": APP_NAME, "time": _now_iso()}), 200
-
-
-# -----------------------------
-# API routes
-# -----------------------------
+# ---------------------------------------
+# API
+# ---------------------------------------
 @app.post("/v1/onboard")
 def onboard():
     payload = request.get_json(silent=True) or {}
 
-    # IMPORTANT: allow re-using creator_id (solves "creator_id غير موجود" after redeploy/reset)
-    provided_creator_id = (payload.get("creator_id") or "").strip()
-    creator_id = provided_creator_id if provided_creator_id else str(uuid.uuid4())
+    display_name = (payload.get("display_name") or "").strip()
+    goal = (payload.get("goal") or "").strip()
+    primary_niche = (payload.get("primary_niche") or "").strip()
 
-    display_name = payload.get("display_name", "Creator")
-    goal = payload.get("goal", "followers")
-    primary_niche = payload.get("primary_niche", "التسويق الرقمي")
-    sub_niches = payload.get("sub_niches", [])
-    language = payload.get("language", "ar")
-    tone = payload.get("tone", "educational")
-    constraints = payload.get("constraints", {})
-    tiktok_profile_url = payload.get("tiktok_profile_url", None)
+    language = (payload.get("language") or "ar").strip()
+    tone = (payload.get("tone") or "educational").strip()
 
-    mode_default = "manual"
+    sub_niches = payload.get("sub_niches", []) or []
+    constraints = payload.get("constraints", {}) or {}
 
-    conn = _db()
-    cur = conn.cursor()
-    cur.execute("SELECT creator_id FROM creators WHERE creator_id=?", (creator_id,))
-    exists = cur.fetchone() is not None
+    tiktok_profile_url = payload.get("tiktok_profile_url")
+    top_video_urls = payload.get("top_video_urls", []) or []
+    weak_video_urls = payload.get("weak_video_urls", []) or []
+    past_scripts = payload.get("past_scripts", []) or []
 
-    if exists:
-        cur.execute(
-            """
-            UPDATE creators
-            SET display_name=?, goal=?, primary_niche=?, sub_niches_json=?,
-                language=?, tone=?, constraints_json=?, tiktok_profile_url=?,
-                mode_default=?
-            WHERE creator_id=?
-            """,
-            (
-                display_name,
-                goal,
-                primary_niche,
-                _json_dump(sub_niches),
-                language,
-                tone,
-                _json_dump(constraints),
-                tiktok_profile_url,
-                mode_default,
-                creator_id,
-            ),
-        )
-        message = "تم تحديث ملفك بنجاح."
-    else:
-        cur.execute(
-            """
-            INSERT INTO creators (
-              creator_id, display_name, goal, primary_niche, sub_niches_json,
-              language, tone, constraints_json, tiktok_profile_url, mode_default, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                creator_id,
-                display_name,
-                goal,
-                primary_niche,
-                _json_dump(sub_niches),
-                language,
-                tone,
-                _json_dump(constraints),
-                tiktok_profile_url,
-                mode_default,
-                _now_iso(),
-            ),
-        )
-        message = "تم إنشاء ملفك بنجاح. الوضع الافتراضي: Manual (بدون ربط TikTok)."
+    if not display_name or not goal or not primary_niche:
+        return jsonify({"error": "display_name و goal و primary_niche مطلوبة"}), 400
 
-    conn.commit()
-    conn.close()
+    creator_id = str(uuid.uuid4())
 
-    return jsonify({"creator_id": creator_id, "message": message, "mode_default": mode_default}), 200
+    creator_payload = {
+        "creator_id": creator_id,
+        "display_name": display_name,
+        "goal": goal,
+        "primary_niche": primary_niche,
+        "sub_niches": sub_niches,
+        "language": language,
+        "tone": tone,
+        "constraints": constraints,
+        "tiktok_profile_url": tiktok_profile_url,
+        "top_video_urls": top_video_urls,
+        "weak_video_urls": weak_video_urls,
+        "past_scripts": past_scripts,
+        "created_at": _now_iso(),
+    }
+
+    _put_creator(creator_id, creator_payload)
+
+    mode_default = "manual"  # حالياً بدون ربط TikTok
+    message = "تم إنشاء ملفك بنجاح. الوضع الافتراضي: Manual (بدون ربط TikTok)."
+
+    return jsonify({
+        "creator_id": creator_id,
+        "message": message,
+        "mode_default": "Manual (بدون ربط TikTok).",
+        "mode_default_key": mode_default
+    }), 200
 
 
 @app.post("/v1/daily-brief")
 def daily_brief():
     payload = request.get_json(silent=True) or {}
-    creator_id = (payload.get("creator_id") or "").strip()
+    creator_id = payload.get("creator_id")
     if not creator_id:
         return jsonify({"error": "creator_id مطلوب"}), 400
 
@@ -408,7 +258,7 @@ def daily_brief():
 @app.post("/v1/build-pack")
 def build_pack():
     payload = request.get_json(silent=True) or {}
-    creator_id = (payload.get("creator_id") or "").strip()
+    creator_id = payload.get("creator_id")
     if not creator_id:
         return jsonify({"error": "creator_id مطلوب"}), 400
 
@@ -442,135 +292,98 @@ def build_pack():
 
     ready_kit_payload = render_ready_to_record_kit(
         blueprint=blueprint,
-        selected_hook_text=vA["hook_text"],
-        selected_onscreen_text=vA["onscreen_text"],
-        hooks_map={v["key"]: {"hook_text": v["hook_text"], "onscreen_text": v["onscreen_text"]} for v in variants},
-        keywords=[niche, angle],
+        idea_title=idea_title,
+        hooks=variants,
+        default_variant=vA,
     )
 
-    experiment_plan_payload = build_experiment_plan()
-    prompt_pack_payload = build_prompt_pack(idea_title=idea_title, angle=angle, value_promise=value_promise)
+    experiment_plan_payload = render_experiment_plan()
+    prompt_pack_payload = render_prompt_pack(
+        idea_title=idea_title,
+        angle=angle,
+        value_promise=value_promise,
+        niche=niche,
+        video_seconds=preferred_length_sec,
+    )
 
     artifacts = []
-    if mode in ("kit", "both"):
+    if mode in ("both", "manual", "ready"):
         artifacts.append({"type": "ready_to_record_kit", "payload": ready_kit_payload})
-        artifacts.append({"type": "experiment_plan", "payload": experiment_plan_payload})
-    if mode in ("prompt_pack", "both"):
-        artifacts.append({"type": "prompt_pack", "payload": prompt_pack_payload})
+    artifacts.append({"type": "experiment_plan", "payload": experiment_plan_payload})
+    artifacts.append({"type": "prompt_pack", "payload": prompt_pack_payload})
 
     experiment_id = str(uuid.uuid4())
+    experiment_payload = {
+        "experiment_id": experiment_id,
+        "creator_id": creator_id,
+        "idea_title": idea_title,
+        "angle": angle,
+        "value_promise": value_promise,
+        "preferred_length_sec": preferred_length_sec,
+        "mode": mode,
+        "predicted": predicted,
+        "artifacts": artifacts,
+        "created_at": _now_iso(),
+    }
+    _put_experiment(experiment_id, creator_id, experiment_payload)
 
-    conn = _db()
-    cur = conn.cursor()
-    cur.execute(
-        """
-        INSERT INTO experiments (
-          experiment_id, creator_id, idea_title, angle, value_promise,
-          preferred_length_sec, mode, artifacts_json, predicted_json, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            experiment_id,
-            creator_id,
-            idea_title,
-            angle,
-            value_promise,
-            preferred_length_sec,
-            mode,
-            _json_dump(artifacts),
-            _json_dump(predicted),
-            _now_iso(),
-        ),
-    )
-    conn.commit()
-    conn.close()
-
-    return jsonify({"experiment_id": experiment_id, "predicted": predicted, "artifacts": artifacts}), 200
+    return jsonify({
+        "experiment_id": experiment_id,
+        "predicted": predicted,
+        "artifacts": artifacts
+    }), 200
 
 
 @app.post("/v1/submit-metrics")
 def submit_metrics():
     payload = request.get_json(silent=True) or {}
-    creator_id = (payload.get("creator_id") or "").strip()
-    experiment_id = (payload.get("experiment_id") or "").strip()
-    variant_key = (payload.get("variant_key") or "A").strip().upper()
-    point = payload.get("point") or {}
+    creator_id = payload.get("creator_id")
+    experiment_id = payload.get("experiment_id")
+    metrics = payload.get("metrics", {})
 
     if not creator_id or not experiment_id:
-        return jsonify({"error": "creator_id و experiment_id مطلوبان"}), 400
+        return jsonify({"error": "creator_id و experiment_id مطلوبة"}), 400
 
     creator = _get_creator(creator_id)
     if not creator:
         return jsonify({"error": "creator_id غير موجود"}), 404
 
     exp = _get_experiment(experiment_id)
-    if not exp or exp.get("creator_id") != creator_id:
-        return jsonify({"error": "experiment_id غير موجود أو لا يطابق creator_id"}), 404
+    if not exp:
+        return jsonify({"error": "experiment_id غير موجود"}), 404
 
-    t_label = (point.get("t_label") or payload.get("t_label") or "T+60m").strip()
+    _put_metrics(experiment_id, creator_id, {"metrics": metrics})
 
-    computed = _compute_point_scores(point)
-    saved = _insert_metric(
-        experiment_id=experiment_id,
-        creator_id=creator_id,
-        variant_key=variant_key,
-        t_label=t_label,
-        metrics=point,
-        computed=computed,
-    )
-
-    return jsonify(
-        {
-            "ok": True,
-            "experiment_id": experiment_id,
-            "creator_id": creator_id,
-            "variant_key": variant_key,
-            "t_label": t_label,
-            "computed": saved["computed"],
-            "metric_id": saved["id"],
-        }
-    ), 200
+    return jsonify({"status": "ok", "message": "تم حفظ المقاييس بنجاح."}), 200
 
 
 @app.get("/v1/report/<experiment_id>")
 def report(experiment_id: str):
-    creator_id = (request.args.get("creator_id", "") or "").strip()
+    creator_id = request.args.get("creator_id")
     if not creator_id:
-        return jsonify({"error": "creator_id مطلوب في query string"}), 400
+        return jsonify({"error": "creator_id مطلوب كـ query param"}), 400
 
     creator = _get_creator(creator_id)
     if not creator:
         return jsonify({"error": "creator_id غير موجود"}), 404
 
     exp = _get_experiment(experiment_id)
-    if not exp or exp.get("creator_id") != creator_id:
-        return jsonify({"error": "experiment_id غير موجود أو لا يطابق creator_id"}), 404
+    if not exp:
+        return jsonify({"error": "experiment_id غير موجود"}), 404
 
-    rows = _fetch_metrics(experiment_id=experiment_id, creator_id=creator_id)
-    decision = _decide_winner(rows)
+    metrics_rows = _list_metrics(experiment_id, creator_id)
 
-    summary = {}
-    for r in rows:
-        k = (r.get("variant_key") or "A").upper()
-        summary.setdefault(k, []).append(
-            {
-                "t_label": r.get("t_label"),
-                "metrics": r.get("metrics"),
-                "computed": r.get("computed"),
-                "created_at": r.get("created_at"),
-            }
-        )
+    return jsonify({
+        "experiment": exp,
+        "metrics": metrics_rows
+    }), 200
 
-    return jsonify(
-        {
-            "creator_id": creator_id,
-            "experiment_id": experiment_id,
-            "idea_title": exp.get("idea_title"),
-            "angle": exp.get("angle"),
-            "value_promise": exp.get("value_promise"),
-            "predicted": exp.get("predicted"),
-            "winner": decision.get("winner"),
-            "scoreboard": decision.get("scoreboard"),
-            "metrics": summary,
-        }
-    ), 200
+
+# ---------------------------------------
+# Entrypoint
+# ---------------------------------------
+init_db()
+
+if __name__ == "__main__":
+    port = int(os.getenv("PORT", "10000"))
+    app.run(host="0.0.0.0", port=port)
