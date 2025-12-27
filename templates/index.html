@@ -1,158 +1,375 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI DOMINATOR | v14.1 SOVEREIGN</title>
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <style>
-        :root { --neon-blue: #00f2ff; --neon-red: #ff0055; --bg: #050505; }
-        body { background: var(--bg); color: #fff; font-family: 'Cairo', sans-serif; margin: 0; padding: 20px; }
-        .cyber-card { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 30px; margin-bottom: 25px; }
-        .dashboard-grid { display: grid; grid-template-columns: 380px 1fr; gap: 30px; }
-        .output-container { display: grid; grid-template-columns: 1fr 450px; gap: 30px; }
-        .cyber-btn { width: 100%; padding: 18px; border: none; border-radius: 12px; background: var(--neon-blue); color: #000; font-weight: 900; cursor: pointer; transition: 0.3s; font-size: 16px; }
-        .tab-btn { padding: 12px 25px; background: #111; border: 1px solid #333; color: #888; cursor: pointer; border-radius: 12px 12px 0 0; }
-        .tab-btn.active { background: var(--neon-blue); color: #000; border-color: var(--neon-blue); }
-        .tab-content { display: none; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.1); padding: 35px; line-height: 1.8; border-radius: 0 20px 20px 20px; position: relative; }
-        .tab-content.active { display: block; }
-        .image-frame { border: 2px solid var(--neon-blue); border-radius: 20px; overflow: hidden; background: #000; height: 500px; display: flex; align-items: center; justify-content: center; }
-        .image-frame img { width: 100%; height: 100%; object-fit: cover; }
-        .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.98); display: none; align-items: center; justify-content: center; z-index: 10000; backdrop-filter: blur(15px); }
-        .modal-content { width: 95%; max-width: 900px; background: #080808; border: 1px solid var(--neon-blue); padding: 40px; border-radius: 25px; max-height: 85vh; overflow-y: auto; }
-        .copy-btn { position: absolute; top: 20px; left: 20px; background: var(--neon-red); color: #fff; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 700; }
-        textarea, input { width: 100%; background: #000; border: 1px solid #333; color: #fff; padding: 15px; border-radius: 12px; margin-bottom: 15px; box-sizing: border-box; font-family: inherit; }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AI DOMINATOR | TikTok-First API Console</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">
+  <style>
+    :root { --blue:#00f2ff; --red:#ff0055; --bg:#050505; --card:rgba(255,255,255,0.03); --stroke:rgba(255,255,255,0.12); }
+    body { background:var(--bg); color:#fff; font-family:'Cairo',sans-serif; margin:0; padding:18px; }
+    h1,h2 { margin:0 0 14px 0; }
+    a { color: var(--blue); text-decoration: none; }
+    .grid { display:grid; grid-template-columns: 420px 1fr; gap: 16px; align-items:start; }
+    .card { background:var(--card); border:1px solid var(--stroke); border-radius:18px; padding:18px; }
+    .btn { width:100%; border:0; border-radius:12px; padding:12px 14px; font-weight:900; cursor:pointer; font-size:15px; }
+    .btn.blue { background:var(--blue); color:#000; }
+    .btn.red { background:var(--red); color:#fff; }
+    .btn.ghost { background:transparent; border:1px solid rgba(255,255,255,0.25); color:#fff; }
+    label { display:block; font-size:12px; opacity:.85; margin:10px 0 6px; }
+    input, textarea, select {
+      width:100%; box-sizing:border-box;
+      background:#000; border:1px solid rgba(255,255,255,0.2);
+      color:#fff; border-radius:12px; padding:10px 12px;
+      font-family: inherit;
+    }
+    textarea { min-height: 78px; resize: vertical; }
+    .row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .pill { display:inline-block; padding:6px 10px; border:1px solid rgba(255,255,255,0.22); border-radius:999px; font-size:12px; opacity:.9; }
+    .status { margin-top:10px; font-size:12px; opacity:.9; }
+    pre {
+      background:#000; border:1px solid rgba(255,255,255,0.18);
+      border-radius:14px; padding:12px; overflow:auto; max-height: 62vh;
+      white-space: pre-wrap;
+    }
+    .ideas { display:grid; gap:10px; margin-top:10px; }
+    .idea { border:1px solid rgba(255,255,255,0.14); border-radius:14px; padding:12px; background:rgba(255,255,255,0.02); }
+    .idea b { color: var(--blue); }
+    .mini { font-size:12px; opacity:.9; }
+    .topbar { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:14px; padding-bottom:12px; border-bottom:1px solid rgba(255,255,255,0.12);}
+  </style>
 </head>
 <body>
-    <header style="display:flex; justify-content:space-between; align-items:center; margin-bottom:40px; border-bottom:1px solid #222; padding-bottom:20px;">
-        <h1>AI DOMINATOR <span style="background:var(--neon-red); padding:4px 12px; border-radius:5px; font-size:14px;">SOVEREIGN v14.1</span></h1>
-        <div style="color:var(--neon-blue); font-weight:900;"><i class="fas fa-shield-alt"></i> NEBULA STABILITY ACTIVE</div>
-    </header>
+  <div class="topbar">
+    <div>
+      <h1>AI DOMINATOR</h1>
+      <div class="pill">TikTok-First API Console</div>
+    </div>
+    <div style="text-align:left;">
+      <div class="mini">JSON debug: <a href="/api" target="_blank">/api</a></div>
+      <div class="mini">Health: <a href="/health" target="_blank">/health</a></div>
+    </div>
+  </div>
 
-    <div class="dashboard-grid">
-        <div class="sidebar">
-            <div class="cyber-card" style="border:1px solid var(--neon-red);">
-                <h3><i class="fas fa-radiation"></i> رادار الهيمنة</h3>
-                <textarea id="targetData" rows="4" placeholder="رابط أو نص المنشور المرجعي..."></textarea>
-                <input id="niche" value="ريادة الأعمال">
-                <button onclick="triggerDiscovery()" id="discoverBtn" class="cyber-btn" style="background:var(--neon-red); color:#fff;">تخليق الاستراتيجية المرجعية</button>
-                <div id="alchemyStatus" style="font-size:11px; margin-top:10px; opacity:0.6;"></div>
-                <div id="goldSuggestions"></div>
-            </div>
+  <div class="grid">
+    <!-- LEFT: Controls -->
+    <div class="card">
+      <h2>1) Onboard (إنشاء/تحديث Creator)</h2>
+
+      <label>creator_id (اختياري — إذا عندك قديم ضعه هنا للحفاظ عليه)</label>
+      <input id="creatorId" placeholder="سيُحفظ تلقائيًا بعد أول Onboard"/>
+
+      <label>display_name</label>
+      <input id="displayName" value="Mohammad"/>
+
+      <div class="row">
+        <div>
+          <label>goal</label>
+          <select id="goal">
+            <option value="followers" selected>followers</option>
+            <option value="sales">sales</option>
+            <option value="leads">leads</option>
+          </select>
         </div>
-
-        <div class="main-content">
-            <div class="cyber-card">
-                <h3>محرك الهيمنة الموحد</h3>
-                <textarea id="inputText" rows="6" placeholder="أدخل فكرتك أو انقل من المختبر..."></textarea>
-                <button id="generateBtn" onclick="startDominanceEngine()" class="cyber-btn">إطلاق الحزمة المتكاملة</button>
-                <div id="engineStatus" style="margin-top:10px; color:var(--neon-blue); font-weight:700;"></div>
-            </div>
-
-            <div id="outputSection" style="display:none;">
-                <div class="output-container">
-                    <div class="text-side">
-                        <div class="tabs-header">
-                            <button class="tab-btn active" onclick="openTab(event, 'linkedin')">LinkedIn</button>
-                            <button class="tab-btn" onclick="openTab(event, 'twitter')">X</button>
-                            <button class="tab-btn" onclick="openTab(event, 'tiktok')">TikTok</button>
-                        </div>
-                        <div id="linkedin" class="tab-content active"><div id="linkedinContent" style="white-space: pre-wrap;"></div></div>
-                        <div id="twitter" class="tab-content"><div id="twitterContent" style="white-space: pre-wrap;"></div></div>
-                        <div id="tiktok" class="tab-content">
-                            <div id="videoBlueprintArea"></div>
-                            <div id="tiktokScript" style="white-space: pre-wrap; margin-top:20px; border-top:1px solid #333; padding-top:20px;"></div>
-                        </div>
-                    </div>
-                    <div class="image-side">
-                        <h3 style="color:var(--neon-blue);">الأصل البصري (الواقعي)</h3>
-                        <div class="image-frame" id="imageFrame">
-                            <div id="imageLoader">جاري تخليق الصورة...</div>
-                            <img id="finalImage" style="display:none;" />
-                        </div>
-                        <button onclick="copyCurrentTab()" class="cyber-btn" style="background:var(--neon-red); color:#fff; margin-top:15px;">نسخ النص 📋</button>
-                    </div>
-                </div>
-            </div>
+        <div>
+          <label>tone</label>
+          <select id="tone">
+            <option value="educational" selected>educational</option>
+            <option value="bold">bold</option>
+            <option value="friendly">friendly</option>
+          </select>
         </div>
+      </div>
+
+      <label>primary_niche</label>
+      <input id="primaryNiche" value="التسويق الرقمي"/>
+
+      <label>sub_niches (افصل بفواصل)</label>
+      <input id="subNiches" value="TikTok,Branding,AI"/>
+
+      <label>language</label>
+      <select id="language">
+        <option value="ar" selected>ar</option>
+        <option value="en">en</option>
+      </select>
+
+      <button class="btn red" onclick="onboard()">Onboard / Update</button>
+      <button class="btn ghost" style="margin-top:10px;" onclick="clearLocal()">مسح البيانات المحلية</button>
+
+      <div class="status" id="onboardStatus"></div>
+
+      <hr style="border:0; border-top:1px solid rgba(255,255,255,0.12); margin:16px 0;">
+
+      <h2>2) Daily Brief</h2>
+      <label>extra_context (اختياري)</label>
+      <textarea id="extraContext" placeholder="أي سياق إضافي يساعد في توليد الأفكار..."></textarea>
+
+      <label>competitor_urls (كل سطر رابط)</label>
+      <textarea id="competitorUrls" placeholder="https://...\nhttps://..."></textarea>
+
+      <button class="btn blue" onclick="dailyBrief()">Generate Ideas</button>
+      <div class="status" id="briefStatus"></div>
+
+      <hr style="border:0; border-top:1px solid rgba(255,255,255,0.12); margin:16px 0;">
+
+      <h2>3) Build Pack</h2>
+      <label>idea_title</label>
+      <input id="ideaTitle" placeholder="سيتعبأ تلقائيًا من الأفكار أو اكتب يدويًا"/>
+
+      <label>angle</label>
+      <input id="angle" placeholder="مثال: قائمة خطوات قابلة للحفظ"/>
+
+      <label>value_promise</label>
+      <input id="valuePromise" placeholder="مثال: خطة بسيطة: نفّذ، قِس، عدّل."/>
+
+      <div class="row">
+        <div>
+          <label>preferred_length_sec</label>
+          <input id="lenSec" type="number" value="28"/>
+        </div>
+        <div>
+          <label>mode</label>
+          <select id="mode">
+            <option value="both" selected>both</option>
+            <option value="kit">kit</option>
+            <option value="prompt_pack">prompt_pack</option>
+          </select>
+        </div>
+      </div>
+
+      <button class="btn red" onclick="buildPack()">Build Pack Now</button>
+      <div class="status" id="packStatus"></div>
+
+      <hr style="border:0; border-top:1px solid rgba(255,255,255,0.12); margin:16px 0;">
+
+      <h2>4) Report</h2>
+      <label>experiment_id</label>
+      <input id="experimentId" placeholder="سيُعبأ تلقائيًا بعد build-pack"/>
+
+      <button class="btn blue" onclick="getReport()">Get Report</button>
+      <div class="status" id="reportStatus"></div>
     </div>
 
-    <!-- Modal -->
-    <div id="superPostModal" class="modal">
-        <div class="modal-content">
-            <h1 style="color:var(--neon-red);">🧬 مختبر التخليق الاستراتيجي</h1>
-            <div id="superPostContent" style="white-space:pre-wrap; background:rgba(255,255,255,0.03); padding:30px; border-radius:20px; border:1px solid rgba(0,242,255,0.1); line-height:1.8;"></div>
-            <div style="display:flex; gap:20px; margin-top:30px;">
-                <button onclick="document.getElementById('superPostModal').style.display='none'" class="cyber-btn" style="background:none; border:1px solid #fff; color:#fff; width:auto; padding:15px 40px;">إغلاق</button>
-                <button onclick="useAsIdea()" class="cyber-btn" style="width:auto; padding:15px 40px;">نقل لمحرك الهيمنة</button>
-            </div>
-        </div>
+    <!-- RIGHT: Output -->
+    <div class="card">
+      <h2>Output</h2>
+      <div class="mini">ملاحظة: فتح الرابط في المتصفح يُظهر هذه الواجهة، والـPOST يتم عبر الأزرار.</div>
+
+      <div id="ideasBox" class="ideas"></div>
+
+      <div style="display:flex; gap:10px; margin:12px 0;">
+        <button class="btn ghost" style="width:auto;" onclick="copyOut()">نسخ الناتج</button>
+        <button class="btn ghost" style="width:auto;" onclick="clearOut()">مسح الناتج</button>
+      </div>
+
+      <pre id="out">{}</pre>
     </div>
+  </div>
 
-    <script>
-        let lastAlchemyResult = null;
-        let activeTab = 'linkedin';
+  <script>
+    const outEl = document.getElementById('out');
 
-        async function triggerDiscovery() {
-            const btn = document.getElementById('discoverBtn');
-            const status = document.getElementById('alchemyStatus');
-            btn.disabled = true; btn.innerHTML = "جاري تفعيل Nebula...";
-            status.innerText = "⏳ جاري البحث عن محرك متاح...";
-            try {
-                const res = await fetch('/alchemy/discover', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({niche: document.getElementById('niche').value, target_data: document.getElementById('targetData').value})});
-                lastAlchemyResult = await res.json();
-                document.getElementById('goldSuggestions').innerHTML = `<div class="cyber-card" style="padding:15px; border-color:var(--neon-blue);">🌟 مرسوم جاهز <button onclick="openModal()" class="cyber-btn" style="margin-top:10px; padding:10px; font-size:13px;">فتح المختبر</button></div>`;
-                status.innerText = "✅ تم العبور!";
-            } catch (e) { status.innerText = "❌ فشل الاتصال."; }
-            btn.disabled = false; btn.innerHTML = "تخليق الاستراتيجية المرجعية";
+    function setOut(obj) {
+      outEl.textContent = JSON.stringify(obj, null, 2);
+    }
+
+    function loadLocal() {
+      const cid = localStorage.getItem('dominator_creator_id') || '';
+      if (cid) document.getElementById('creatorId').value = cid;
+
+      const exp = localStorage.getItem('dominator_experiment_id') || '';
+      if (exp) document.getElementById('experimentId').value = exp;
+    }
+
+    function clearLocal() {
+      localStorage.removeItem('dominator_creator_id');
+      localStorage.removeItem('dominator_experiment_id');
+      document.getElementById('creatorId').value = '';
+      document.getElementById('experimentId').value = '';
+      document.getElementById('onboardStatus').textContent = 'تم مسح البيانات المحلية.';
+    }
+
+    async function postJson(path, body) {
+      const res = await fetch(path, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json; charset=utf-8' },
+        body: JSON.stringify(body)
+      });
+      const txt = await res.text();
+      let data = null;
+      try { data = JSON.parse(txt); } catch (e) { data = { raw: txt }; }
+      if (!res.ok) {
+        const msg = (data && (data.error || data.message)) ? (data.error || data.message) : ('HTTP ' + res.status);
+        throw new Error(msg);
+      }
+      return data;
+    }
+
+    function mustCreatorId() {
+      const cid = (document.getElementById('creatorId').value || '').trim();
+      if (!cid) throw new Error('نفّذ Onboard أولاً للحصول على creator_id');
+      return cid;
+    }
+
+    async function onboard() {
+      const st = document.getElementById('onboardStatus');
+      st.textContent = '... جاري التنفيذ';
+      try {
+        const cid = (document.getElementById('creatorId').value || '').trim() || null;
+
+        const payload = {
+          creator_id: cid,
+          display_name: document.getElementById('displayName').value,
+          goal: document.getElementById('goal').value,
+          primary_niche: document.getElementById('primaryNiche').value,
+          sub_niches: (document.getElementById('subNiches').value || '')
+            .split(',').map(s => s.trim()).filter(Boolean),
+          language: document.getElementById('language').value,
+          tone: document.getElementById('tone').value,
+          constraints: {},
+          tiktok_profile_url: null
+        };
+
+        const data = await postJson('/v1/onboard', payload);
+
+        document.getElementById('creatorId').value = data.creator_id;
+        localStorage.setItem('dominator_creator_id', data.creator_id);
+
+        st.textContent = '✅ ' + (data.message || 'OK') + ' | creator_id محفوظ.';
+        setOut(data);
+      } catch (e) {
+        st.textContent = '❌ ' + e.message;
+      }
+    }
+
+    async function dailyBrief() {
+      const st = document.getElementById('briefStatus');
+      const ideasBox = document.getElementById('ideasBox');
+      ideasBox.innerHTML = '';
+      st.textContent = '... جاري توليد الأفكار';
+
+      try {
+        const cid = mustCreatorId();
+        const competitor_urls = (document.getElementById('competitorUrls').value || '')
+          .split('\n').map(s => s.trim()).filter(Boolean);
+
+        const payload = {
+          creator_id: cid,
+          competitor_urls,
+          extra_context: document.getElementById('extraContext').value || ''
+        };
+
+        const data = await postJson('/v1/daily-brief', payload);
+        setOut(data);
+
+        const ideas = data.ideas || [];
+        if (!ideas.length) {
+          st.textContent = '✅ تم التنفيذ، لكن لا توجد أفكار.';
+          return;
         }
 
-        function openModal() { document.getElementById('superPostModal').style.display = 'flex'; document.getElementById('superPostContent').innerText = lastAlchemyResult.super_post; }
-        function useAsIdea() { document.getElementById('inputText').value = lastAlchemyResult.super_post; document.getElementById('superPostModal').style.display = 'none'; }
+        st.textContent = '✅ تم توليد ' + ideas.length + ' فكرة. اختر واحدة لبناء Pack.';
+        ideas.forEach((idea, idx) => {
+          const div = document.createElement('div');
+          div.className = 'idea';
+          div.innerHTML = `
+            <div class="mini">#${idx+1} — <b>${escapeHtml(idea.title || '')}</b></div>
+            <div class="mini">Angle: ${escapeHtml(idea.angle || '')}</div>
+            <div class="mini">Value: ${escapeHtml(idea.value_promise || '')}</div>
+            <div style="display:flex; gap:10px; margin-top:10px;">
+              <button class="btn red" style="width:auto;" onclick='useIdea(${idx})'>استخدام وبناء Pack</button>
+              <button class="btn ghost" style="width:auto;" onclick='copyText(${JSON.stringify(idea.title || "")})'>نسخ العنوان</button>
+            </div>
+          `;
+          ideasBox.appendChild(div);
+        });
 
-        async function startDominanceEngine() {
-            const idea = document.getElementById('inputText').value;
-            if(!idea) return alert("أدخل فكرة");
-            document.getElementById('generateBtn').disabled = true;
-            document.getElementById('outputSection').style.display = 'block';
-            document.getElementById('imageLoader').style.display = 'block';
-            document.getElementById('finalImage').style.display = 'none';
-            document.getElementById('engineStatus').innerText = "🚀 جاري التوليد الموحد عبر Nebula...";
-            
-            try {
-                const res = await fetch('/generate_all', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({text: idea})});
-                const data = await res.json();
-                document.getElementById('linkedinContent').innerText = data.linkedin;
-                document.getElementById('twitterContent').innerText = data.twitter;
-                document.getElementById('tiktokScript').innerText = data.tiktok;
-                
-                let vHtml = "<h3 style='color:var(--neon-blue);'>🎬 المخطط السينمائي</h3>";
-                data.video_blueprint.forEach(s => { vHtml += `<div style="background:rgba(0,0,0,0.3); padding:10px; border-radius:10px; border-right:3px solid var(--neon-red); margin-bottom:10px;"><b>${s.time}</b><br><small>${s.prompt}</small></div>`; });
-                document.getElementById('videoBlueprintArea').innerHTML = vHtml;
-                
-                const img = document.getElementById('finalImage');
-                img.src = data.image_url;
-                img.onload = () => { document.getElementById('imageLoader').style.display = 'none'; img.style.display = 'block'; };
-                document.getElementById('engineStatus').innerText = "✅ تم الإطلاق بنجاح!";
-            } catch(e) { alert("فشل التوليد"); }
-            document.getElementById('generateBtn').disabled = false;
+        window.__lastIdeas = ideas;
+      } catch (e) {
+        st.textContent = '❌ ' + e.message;
+      }
+    }
+
+    function useIdea(i) {
+      const ideas = window.__lastIdeas || [];
+      const idea = ideas[i];
+      if (!idea) return;
+
+      document.getElementById('ideaTitle').value = idea.title || '';
+      document.getElementById('angle').value = idea.angle || '';
+      document.getElementById('valuePromise').value = idea.value_promise || '';
+      buildPack();
+    }
+
+    async function buildPack() {
+      const st = document.getElementById('packStatus');
+      st.textContent = '... جاري بناء الحزمة';
+
+      try {
+        const cid = mustCreatorId();
+        const payload = {
+          creator_id: cid,
+          idea_title: document.getElementById('ideaTitle').value,
+          angle: document.getElementById('angle').value,
+          value_promise: document.getElementById('valuePromise').value,
+          preferred_length_sec: Number(document.getElementById('lenSec').value || 28),
+          mode: document.getElementById('mode').value
+        };
+
+        const data = await postJson('/v1/build-pack', payload);
+        setOut(data);
+
+        if (data.experiment_id) {
+          document.getElementById('experimentId').value = data.experiment_id;
+          localStorage.setItem('dominator_experiment_id', data.experiment_id);
         }
 
-        function openTab(evt, p) {
-            activeTab = p;
-            document.querySelectorAll('.tab-content').forEach(c => c.style.display = 'none');
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            document.getElementById(p).style.display = 'block';
-            evt.currentTarget.classList.add('active');
-        }
+        st.textContent = '✅ تم بناء الحزمة. experiment_id محفوظ.';
+      } catch (e) {
+        st.textContent = '❌ ' + e.message + ' (إذا ظهر "creator_id غير موجود" نفّذ Onboard من جديد)';
+      }
+    }
 
-        function copyCurrentTab() {
-            const id = activeTab === 'tiktok' ? 'tiktokScript' : activeTab + 'Content';
-            navigator.clipboard.writeText(document.getElementById(id).innerText);
-            alert("تم النسخ!");
-        }
-    </script>
+    async function getReport() {
+      const st = document.getElementById('reportStatus');
+      st.textContent = '... جاري جلب التقرير';
+      try {
+        const cid = mustCreatorId();
+        const expId = (document.getElementById('experimentId').value || '').trim();
+        if (!expId) throw new Error('experiment_id مطلوب');
+
+        const res = await fetch(`/v1/report/${encodeURIComponent(expId)}?creator_id=${encodeURIComponent(cid)}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+        setOut(data);
+        st.textContent = '✅ تم جلب التقرير.';
+      } catch (e) {
+        st.textContent = '❌ ' + e.message;
+      }
+    }
+
+    function copyOut() {
+      navigator.clipboard.writeText(outEl.textContent || '{}');
+      alert('تم النسخ');
+    }
+
+    function clearOut() {
+      setOut({});
+      document.getElementById('ideasBox').innerHTML = '';
+    }
+
+    function copyText(t) {
+      navigator.clipboard.writeText(t || '');
+      alert('تم النسخ');
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, m => ({
+        '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'
+      }[m]));
+    }
+
+    loadLocal();
+  </script>
 </body>
 </html>
