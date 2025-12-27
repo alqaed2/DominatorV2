@@ -1,166 +1,108 @@
-from __future__ import annotations
-from typing import Any
-import random
-import textwrap
+from typing import Any, Dict, List
 
-from config import settings
-from utils.logging import get_logger
-from services.scoring import dominance_score_v1
-
-log = get_logger("generator")
+from services.scoring import score_hook  # إذا لم يكن عندك services/scoring.py، أخبرني وسأدمج الدالة هنا فورًا
 
 
-def _basic_keywords(niche: str) -> list[str]:
-    base = [niche.strip()]
-    if len(niche.split()) >= 2:
-        base.append(niche.split()[0])
-    return list(dict.fromkeys([k for k in base if k]))
-
-
-def _basic_hashtags(niche: str) -> list[str]:
-    # keep 2-4 as recommended
-    tag = niche.replace(" ", "")
-    return [f"#{tag}", "#تعلم", "#نصائح"][:3]
-
-
-def build_blueprint(
-    creator: dict[str, Any],
-    idea_title: str,
-    angle: str,
-    value_promise: str,
-    preferred_length_sec: int = 28,
-) -> dict[str, Any]:
-    """
-    Deterministic blueprint builder for MVP.
-    Later we can plug LLM here with structured JSON output.
-    """
-    niche = creator["primary_niche"]
-    tone = creator["tone"]
-    lang = creator["language"]
-
-    keywords = _basic_keywords(niche)
-    hashtags = _basic_hashtags(niche)
-
-    # Script skeleton (Arabic-first)
-    hook_placeholder = "{{HOOK}}"
-    problem = f"معظم الناس في {niche} يقعوا في خطأ واحد…"
-    solution = f"الحل في 3 خطوات: (1) حدد الهدف بدقة، (2) نفّذ خطوة واحدة اليوم، (3) راقب النتيجة وعدّل."
-    cta = "اكتب كلمة (جاهز) بالتعليقات وسأرسل لك الخطوات بشكل أوضح."
-
-    script = textwrap.dedent(f"""
-    {hook_placeholder}
-    {problem}
-    {solution}
-    {cta}
-    """).strip()
-
-    onscreen_srt = textwrap.dedent(f"""
-    1
-    00:00:00,000 --> 00:00:02,000
-    {{HOOK}}
-
-    2
-    00:00:02,000 --> 00:00:08,000
-    {problem}
-
-    3
-    00:00:08,000 --> 00:00:22,000
-    {solution}
-
-    4
-    00:00:22,000 --> 00:00:28,000
-    {cta}
-    """).strip()
-
-    edit_cues = [
-        "تغيير لقطة/زووم بسيط كل 1.5–2 ثانية.",
-        "أظهر الكلمات المفتاحية على الشاشة.",
-        "اجعل الـHook بصوت قوي + نص كبير."
-    ]
-    shot_list = [
-        "لقطة قريبة للوجه/المتحدث مع إضاءة جيدة.",
-        "B-roll بسيط أثناء ذكر الخطوات.",
-        "لقطة ختام مع CTA على الشاشة."
+def _why_common() -> List[str]:
+    return [
+        "الهوك واضح بما يكفي لإثارة الانتباه خلال أول ثانية.",
+        "وجود فضول/وعد واضح يزيد احتمالية المتابعة (Open Loop).",
+        "استخدام محفّز (خطأ/قائمة/زمن) يرفع نية المشاهدة حتى النهاية.",
     ]
 
-    hooks = {
-        "A": {"hook_text": f"إذا كنت في {niche} وتفعل هذا… فأنت تخسر بدون أن تدري.", "onscreen_text": f"توقف عن هذا في {niche}!"},
-        "B": {"hook_text": f"3 أخطاء تمنعك من التقدم في {niche}… رقم 2 صادم.", "onscreen_text": "3 أخطاء قاتلة"},
-        "C": {"hook_text": f"في أقل من 30 ثانية… سأعطيك طريقة عملية لتحسن نتيجتك في {niche}.", "onscreen_text": "طريقة خلال 30 ثانية"},
-    }
 
-    blueprint = {
-        "title": idea_title,
-        "angle": angle,
-        "value_promise": value_promise,
-        "length_sec": int(preferred_length_sec),
-
-        "problem": problem,
-        "problem_onscreen": "الخطأ الشائع",
-        "solution": solution,
-        "solution_onscreen": "الحل (3 خطوات)",
-        "cta": cta,
-        "cta_onscreen": "اكتب (جاهز) 👇",
-
-        "script": script,
-        "onscreen_srt": onscreen_srt,
-        "edit_cues": edit_cues,
-        "shot_list": shot_list,
-        "caption": f"{value_promise}\n# {niche}",
-        "keywords": keywords,
-        "hashtags": hashtags,
-        "hooks": hooks,
-
-        # Prompt pack templates (for external generation)
-        "prompt_script": f"اكتب سكربت TikTok ({preferred_length_sec} ثانية) عن: {idea_title} بزاوية: {angle} وبقيمة: {value_promise}. ابدأ بهوك قوي خلال 1 ثانية.",
-        "prompt_hooks": f"ولّد 3 Hooks مختلفة (A/B/C) عن {idea_title}، كل Hook <= 14 كلمة، مع نص شاشة قصير.",
-        "prompt_editing": "اقترح إرشادات مونتاج سريع: تقطيع، تكبير، نص على الشاشة كل 1-2 ثانية، مع إيقاع عالي.",
-        "prompt_visual": "اقترح شكل بصري للـFrame الأول + نص كبير واضح + ألوان متناسقة.",
-        "prompt_next_series": f"اقترح 5 أفكار (Part 2/3/4) مبنية على نفس زاوية {angle} لتعزيز سلسلة محتوى."
-    }
-    return blueprint
-
-
-def generate_daily_ideas(creator: dict[str, Any], competitor_urls: list[str] | None = None) -> list[dict[str, Any]]:
+def generate_daily_brief(
+    primary_niche: str,
+    language: str = "ar",
+    tone: str = "educational",
+    competitor_urls: List[str] | None = None,
+    extra_context: str = "",
+) -> List[Dict[str, Any]]:
     """
-    MVP: generate 3 idea candidates deterministically.
+    Produces 3 ideas + variants A/B/C per idea.
     """
-    niche = creator["primary_niche"]
-    goal = creator["goal"]
+    niche = (primary_niche or "مجالك").strip()
 
-    candidates = [
+    ideas = [
         {
-            "title": f"خطأ شائع يمنعك من النجاح في {niche}",
             "angle": "تفكيك خطأ + بديل عملي",
-            "value_promise": "خطوة واحدة تصحح المسار خلال يوم واحد."
+            "title": f"خطأ شائع يمنعك من النجاح في {niche}",
+            "value_promise": "خطوة واحدة تصحح المسار خلال يوم واحد.",
         },
         {
-            "title": f"3 خطوات سريعة لتحسين نتائجك في {niche}",
             "angle": "قائمة خطوات قابلة للحفظ",
-            "value_promise": "خطة بسيطة: نفّذ، قِس، عدّل."
+            "title": f"3 خطوات سريعة لتحسين نتائجك في {niche}",
+            "value_promise": "خطة بسيطة: نفّذ، قِس، عدّل.",
         },
         {
-            "title": f"السبب الحقيقي لعدم تقدمك في {niche} (والحل)",
             "angle": "سبب جذري + علاج مباشر",
-            "value_promise": "تغيير صغير يرفع نتائجك بشكل ملحوظ."
+            "title": f"السبب الحقيقي لعدم تقدمك في {niche} (والحل)",
+            "value_promise": "تغيير صغير يرفع نتائجك بشكل ملحوظ.",
         },
     ]
-    return candidates
 
+    out = []
+    for it in ideas:
+        variants = build_variants_for_idea(title=it["title"], angle=it["angle"], niche=niche)
+        it2 = dict(it)
+        it2["variants"] = variants
+        out.append(it2)
 
-def score_variants(blueprint: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    """
-    Returns scored variants with why+minimum_fix.
-    """
-    out = {}
-    for key in ["A", "B", "C"]:
-        v = blueprint["hooks"][key]
-        res = dominance_score_v1(v["hook_text"], v["onscreen_text"], blueprint)
-        out[key] = {
-            "hook_text": v["hook_text"],
-            "onscreen_text": v["onscreen_text"],
-            "score": float(res.score),
-            "why": res.why,
-            "minimum_fix": res.minimum_fix,
-        }
     return out
+
+
+def build_variants_for_idea(title: str, angle: str, niche: str) -> List[Dict[str, Any]]:
+    """
+    IMPORTANT CHANGE:
+    Variant B adapts to the idea title.
+    - If the idea is "3 خطوات..." => B becomes "3 خطوات..." (not "3 أخطاء...").
+    """
+    title = (title or "").strip()
+    niche = (niche or "مجالك").strip()
+
+    minimum_fix = "أضف CTA واحدًا واضحًا: (اكتب كلمة X بالتعليقات) أو (احفظ الفيديو لقائمة الخطوات)."
+
+    # A: pain-based
+    hook_a = f"إذا كنت في {niche} وتفعل هذا… فأنت تخسر بدون أن تدري."
+    on_a = f"توقف عن هذا في {niche}!"
+
+    # B: title-adaptive list/curiosity
+    if "3 خطوات" in title:
+        hook_b = f"3 خطوات ترفع نتائجك في {niche}… الخطوة 2 تغيّر اللعبة."
+        on_b = "3 خطوات سريعة"
+    else:
+        hook_b = f"3 أخطاء تمنعك من التقدم في {niche}… رقم 2 صادم."
+        on_b = "3 أخطاء قاتلة"
+
+    # C: time-bound promise
+    hook_c = f"في أقل من 30 ثانية… طريقة عملية لتحسن نتيجتك في {niche}."
+    on_c = "طريقة خلال 30 ثانية"
+
+    variants = [
+        {
+            "key": "A",
+            "hook_text": hook_a,
+            "onscreen_text": on_a,
+            "minimum_fix": minimum_fix,
+            "why": _why_common(),
+            "score": float(score_hook(hook_a, on_a)),
+        },
+        {
+            "key": "B",
+            "hook_text": hook_b,
+            "onscreen_text": on_b,
+            "minimum_fix": minimum_fix,
+            "why": _why_common(),
+            "score": float(score_hook(hook_b, on_b)),
+        },
+        {
+            "key": "C",
+            "hook_text": hook_c,
+            "onscreen_text": on_c,
+            "minimum_fix": minimum_fix,
+            "why": _why_common(),
+            "score": float(score_hook(hook_c, on_c)),
+        },
+    ]
+
+    return variants
