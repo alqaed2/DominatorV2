@@ -2,348 +2,174 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>AI DOMINATOR — API Console</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>AI Dominator V2 — UI</title>
   <style>
-    :root { --bg:#0b0f17; --panel:#111827; --muted:#9ca3af; --text:#e5e7eb; --line:#1f2937; --btn:#2563eb; --btn2:#16a34a; --err:#ef4444; }
-    body { margin:0; font-family: system-ui, -apple-system, "Segoe UI", Arial; background:var(--bg); color:var(--text); }
-    header { padding:16px 18px; border-bottom:1px solid var(--line); background:rgba(17,24,39,.6); backdrop-filter: blur(6px); position:sticky; top:0; }
-    h1 { margin:0; font-size:16px; }
-    .wrap { max-width: 1100px; margin: 0 auto; padding: 16px; display:grid; gap: 14px; }
-    .grid { display:grid; grid-template-columns: 1fr; gap: 14px; }
-    @media (min-width: 980px){ .grid { grid-template-columns: 1fr 1fr; } }
-    .card { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:14px; }
-    .card h2 { margin:0 0 10px; font-size:14px; }
-    label { display:block; font-size:12px; color:var(--muted); margin:10px 0 6px; }
-    input, textarea, select {
-      width:100%; box-sizing:border-box; border-radius:10px; border:1px solid var(--line);
-      background:#0f172a; color:var(--text); padding:10px; outline:none;
-    }
-    textarea { min-height: 90px; resize: vertical; }
-    .row { display:grid; grid-template-columns: 1fr; gap:10px; }
-    @media (min-width: 640px){ .row { grid-template-columns: 1fr 1fr; } }
-    .btns { display:flex; gap:10px; flex-wrap: wrap; margin-top: 12px; }
-    button {
-      border:none; border-radius:10px; padding:10px 12px; cursor:pointer; font-weight:600;
-      background:var(--btn); color:white;
-    }
-    button.secondary { background:#334155; }
-    button.success { background:var(--btn2); }
-    .hint { font-size:12px; color:var(--muted); line-height: 1.5; }
-    pre {
-      background:#0a1224; border:1px solid var(--line); border-radius:14px;
-      padding:12px; overflow:auto; max-height: 340px;
-    }
-    .status { display:flex; align-items:center; gap:10px; font-size:12px; color:var(--muted); }
-    .dot { width:10px; height:10px; border-radius:99px; background:#64748b; display:inline-block; }
-    .dot.ok { background:#22c55e; }
-    .dot.bad { background:#ef4444; }
-    .warn { color:#f59e0b; }
-    .err { color:var(--err); }
-    .small { font-size:12px; }
-    code { color:#a7f3d0; }
+    body{font-family:system-ui,Segoe UI,Tahoma,Arial; margin:16px; background:#0b0f14; color:#e8eef6}
+    .card{background:#111826; border:1px solid #233047; border-radius:14px; padding:14px; margin:12px 0}
+    input, textarea, select{width:100%; padding:10px; border-radius:10px; border:1px solid #2b3a55; background:#0b1220; color:#e8eef6}
+    button{padding:10px 14px; border-radius:10px; border:1px solid #2b3a55; background:#17233a; color:#e8eef6; cursor:pointer}
+    button:hover{background:#1f3152}
+    pre{white-space:pre-wrap; background:#060a10; border:1px solid #233047; border-radius:12px; padding:12px; overflow:auto}
+    .row{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+    @media (max-width:900px){ .row{grid-template-columns:1fr} }
+    .hint{opacity:.85; font-size:13px}
   </style>
 </head>
 <body>
-<header>
-  <div class="wrap" style="padding:0 16px;">
-    <h1>AI DOMINATOR — API Console (Browser)</h1>
-    <div class="status">
-      <span id="dot" class="dot"></span>
-      <span id="svc">Checking service…</span>
-      <span class="small">Base: <code id="base"></code></span>
-    </div>
-  </div>
-</header>
+  <h2>AI Dominator V2 — اختبار API من المتصفح</h2>
+  <div class="hint">هذه الصفحة تعمل عبر POST باستخدام fetch. افتحها من نفس الدومين ثم جرّب الأزرار.</div>
 
-<div class="wrap">
   <div class="card">
-    <div class="hint">
-      هذه الصفحة تسمح لك بتنفيذ <b>POST</b> من المتصفح مباشرة (Fetch)، بدون Postman / curl.
-      <br/>
-      <span class="warn">ملاحظة مهمة:</span> إذا عملت redeploy على Render بدون “Persistent Disk”، قاعدة البيانات قد تُمسح وتحتاج تعمل <b>Onboard</b> من جديد للحصول على <b>creator_id</b> جديد.
+    <h3>1) Onboard</h3>
+    <div class="row">
+      <div>
+        <label>Display name</label>
+        <input id="display_name" value="Mohammad" />
+      </div>
+      <div>
+        <label>Primary niche</label>
+        <input id="primary_niche" value="التسويق الرقمي" />
+      </div>
     </div>
-  </div>
-
-  <div class="grid">
-    <!-- Onboard -->
-    <div class="card">
-      <h2>1) Onboard — POST /v1/onboard</h2>
-
-      <div class="row">
-        <div>
-          <label>display_name</label>
-          <input id="display_name" value="Mohammad" />
-        </div>
-        <div>
-          <label>goal</label>
-          <input id="goal" value="followers" />
-        </div>
+    <div class="row">
+      <div>
+        <label>Goal</label>
+        <select id="goal">
+          <option value="followers" selected>followers</option>
+          <option value="sales">sales</option>
+          <option value="leads">leads</option>
+        </select>
       </div>
-
-      <label>primary_niche</label>
-      <input id="primary_niche" value="التسويق الرقمي" />
-
-      <label>sub_niches (افصل بفاصلة)</label>
-      <input id="sub_niches" value="TikTok, Branding, AI" />
-
-      <div class="row">
-        <div>
-          <label>language</label>
-          <select id="language">
-            <option value="ar" selected>ar</option>
-            <option value="en">en</option>
-          </select>
-        </div>
-        <div>
-          <label>tone</label>
-          <select id="tone">
-            <option value="educational" selected>educational</option>
-            <option value="casual">casual</option>
-            <option value="storytelling">storytelling</option>
-            <option value="authoritative">authoritative</option>
-          </select>
-        </div>
+      <div>
+        <label>Tone</label>
+        <select id="tone">
+          <option value="educational" selected>educational</option>
+          <option value="storytelling">storytelling</option>
+          <option value="humorous">humorous</option>
+        </select>
       </div>
-
-      <label>constraints (JSON اختياري)</label>
-      <textarea id="constraints">{}</textarea>
-
-      <div class="btns">
-        <button class="success" onclick="doOnboard()">Run Onboard</button>
-        <button class="secondary" onclick="copyCreatorId()">Copy creator_id</button>
-      </div>
-
-      <label>Response</label>
-      <pre id="out_onboard">{}</pre>
     </div>
-
-    <!-- Build Pack -->
-    <div class="card">
-      <h2>2) Build Pack — POST /v1/build-pack</h2>
-
-      <label>creator_id</label>
-      <input id="creator_id" placeholder="سيتم تعبئته تلقائيًا بعد Onboard" />
-
-      <label>idea_title</label>
-      <input id="idea_title" value="3 خطوات سريعة لتحسين نتائجك في التسويق الرقمي" />
-
-      <label>angle</label>
-      <input id="angle" value="قائمة خطوات قابلة للحفظ" />
-
-      <label>value_promise</label>
-      <input id="value_promise" value="خطة بسيطة: نفّذ، قِس، عدّل." />
-
-      <div class="row">
-        <div>
-          <label>preferred_length_sec</label>
-          <input id="preferred_length_sec" type="number" value="28" />
-        </div>
-        <div>
-          <label>mode</label>
-          <select id="mode">
-            <option value="both" selected>both</option>
-            <option value="manual">manual</option>
-            <option value="ready">ready</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="btns">
-        <button class="success" onclick="doBuildPack()">Run Build Pack</button>
-      </div>
-
-      <label>Response</label>
-      <pre id="out_buildpack">{}</pre>
-    </div>
-
-    <!-- Daily Brief -->
-    <div class="card">
-      <h2>3) Daily Brief — POST /v1/daily-brief</h2>
-
-      <label>creator_id</label>
-      <input id="creator_id2" />
-
-      <label>competitor_urls (سطر لكل رابط)</label>
-      <textarea id="competitor_urls"></textarea>
-
-      <label>extra_context</label>
-      <textarea id="extra_context" placeholder="أي سياق إضافي…"></textarea>
-
-      <div class="btns">
-        <button class="success" onclick="doDailyBrief()">Run Daily Brief</button>
-      </div>
-
-      <label>Response</label>
-      <pre id="out_dailybrief">{}</pre>
-    </div>
-
-    <!-- Report -->
-    <div class="card">
-      <h2>4) Report — GET /v1/report/&lt;experiment_id&gt;?creator_id=...</h2>
-
-      <label>creator_id</label>
-      <input id="creator_id3" />
-
-      <label>experiment_id</label>
-      <input id="experiment_id" placeholder="سيظهر في نتيجة build-pack" />
-
-      <div class="btns">
-        <button class="success" onclick="doReport()">Get Report</button>
-      </div>
-
-      <label>Response</label>
-      <pre id="out_report">{}</pre>
+    <label>Sub niches (comma separated)</label>
+    <input id="sub_niches" value="TikTok, Branding, AI" />
+    <div style="margin-top:10px">
+      <button onclick="doOnboard()">POST /v1/onboard</button>
     </div>
   </div>
 
   <div class="card">
-    <h2>ملاحظات تشغيل سريعة</h2>
-    <div class="hint">
-      <ol>
-        <li>افتح رابطك الرئيسي: <code>https://dominatorv2.onrender.com/</code></li>
-        <li>اضغط <b>Run Onboard</b> لتحصل على <code>creator_id</code></li>
-        <li>اضغط <b>Run Build Pack</b> (سيستعمل creator_id تلقائيًا)</li>
-        <li>إذا ظهر لك خطأ <span class="err">creator_id غير موجود</span> بعد Redeploy: هذا يعني قاعدة البيانات انمسحت — أعد Onboard.</li>
-      </ol>
+    <h3>2) Daily Brief</h3>
+    <label>Creator ID</label>
+    <input id="creator_id" placeholder="سيتم تعبئته تلقائيًا بعد Onboard" />
+    <label style="margin-top:10px">n_ideas</label>
+    <input id="n_ideas" type="number" value="3" />
+    <div style="margin-top:10px">
+      <button onclick="doDailyBrief()">POST /v1/daily-brief</button>
     </div>
   </div>
-</div>
+
+  <div class="card">
+    <h3>3) Build Pack</h3>
+    <label>Creator ID</label>
+    <input id="creator_id2" placeholder="انسخ Creator ID هنا" />
+    <label style="margin-top:10px">Idea title</label>
+    <input id="idea_title" value="3 خطوات سريعة لتحسين نتائجك في التسويق الرقمي" />
+    <label style="margin-top:10px">Angle</label>
+    <input id="angle" value="قائمة خطوات قابلة للحفظ" />
+    <label style="margin-top:10px">Value promise</label>
+    <input id="value_promise" value="خطة بسيطة: نفّذ، قِس، عدّل." />
+    <div class="row" style="margin-top:10px">
+      <div>
+        <label>Preferred length (sec)</label>
+        <input id="preferred_length_sec" type="number" value="28" />
+      </div>
+      <div>
+        <label>Mode</label>
+        <select id="mode">
+          <option value="both" selected>both</option>
+          <option value="manual">manual</option>
+        </select>
+      </div>
+    </div>
+    <div style="margin-top:10px">
+      <button onclick="doBuildPack()">POST /v1/build-pack</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>النتيجة</h3>
+    <pre id="out">—</pre>
+  </div>
 
 <script>
-  const base = window.location.origin;
-  document.getElementById("base").textContent = base;
-
-  function pretty(x){ return JSON.stringify(x, null, 2); }
-  function setOut(id, obj){ document.getElementById(id).textContent = typeof obj === "string" ? obj : pretty(obj); }
-
-  async function check() {
-    try {
-      const r = await fetch(base + "/health");
-      const j = await r.json();
-      document.getElementById("dot").className = "dot ok";
-      document.getElementById("svc").textContent = `OK — ${j.service}`;
-    } catch (e) {
-      document.getElementById("dot").className = "dot bad";
-      document.getElementById("svc").textContent = "Service unreachable";
-    }
-  }
-  check();
-
-  function hydrateCreatorId(id) {
-    if (!id) return;
-    document.getElementById("creator_id").value = id;
-    document.getElementById("creator_id2").value = id;
-    document.getElementById("creator_id3").value = id;
-    localStorage.setItem("creator_id", id);
+  function show(obj){
+    document.getElementById('out').textContent = typeof obj === 'string' ? obj : JSON.stringify(obj, null, 2);
   }
 
-  // load saved creator_id
-  hydrateCreatorId(localStorage.getItem("creator_id"));
-
-  async function postJSON(path, body) {
-    const r = await fetch(base + path, {
-      method: "POST",
-      headers: { "Content-Type": "application/json; charset=utf-8" },
+  async function postJSON(path, body){
+    const res = await fetch(path, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json; charset=utf-8'},
       body: JSON.stringify(body)
     });
-    const text = await r.text();
+    const text = await res.text();
     let data;
-    try { data = JSON.parse(text); } catch { data = text; }
-    return { ok: r.ok, status: r.status, data };
-  }
-
-  async function getJSON(path) {
-    const r = await fetch(base + path);
-    const text = await r.text();
-    let data;
-    try { data = JSON.parse(text); } catch { data = text; }
-    return { ok: r.ok, status: r.status, data };
+    try{ data = JSON.parse(text); } catch(e){ data = text; }
+    if(!res.ok){
+      throw new Error((data && data.error) ? data.error : ("HTTP " + res.status));
+    }
+    return data;
   }
 
   async function doOnboard(){
-    const sub = (document.getElementById("sub_niches").value || "")
-      .split(",").map(s => s.trim()).filter(Boolean);
-
-    let constraints = {};
-    try { constraints = JSON.parse(document.getElementById("constraints").value || "{}"); }
-    catch { constraints = {}; }
-
-    const body = {
-      display_name: document.getElementById("display_name").value,
-      goal: document.getElementById("goal").value,
-      primary_niche: document.getElementById("primary_niche").value,
-      sub_niches: sub,
-      language: document.getElementById("language").value,
-      tone: document.getElementById("tone").value,
-      constraints,
-      tiktok_profile_url: null,
-      top_video_urls: [],
-      weak_video_urls: [],
-      past_scripts: []
-    };
-
-    const res = await postJSON("/v1/onboard", body);
-    setOut("out_onboard", res);
-
-    if (res.ok && res.data && res.data.creator_id) {
-      hydrateCreatorId(res.data.creator_id);
-    }
-  }
-
-  async function doBuildPack(){
-    const body = {
-      creator_id: document.getElementById("creator_id").value.trim(),
-      idea_title: document.getElementById("idea_title").value,
-      angle: document.getElementById("angle").value,
-      value_promise: document.getElementById("value_promise").value,
-      preferred_length_sec: Number(document.getElementById("preferred_length_sec").value || 28),
-      mode: document.getElementById("mode").value
-    };
-
-    const res = await postJSON("/v1/build-pack", body);
-    setOut("out_buildpack", res);
-
-    // auto-fill experiment_id if present
-    if (res.ok && res.data && res.data.experiment_id) {
-      document.getElementById("experiment_id").value = res.data.experiment_id;
-    }
+    try{
+      const sub = document.getElementById('sub_niches').value.split(',').map(s=>s.trim()).filter(Boolean);
+      const payload = {
+        display_name: document.getElementById('display_name').value,
+        goal: document.getElementById('goal').value,
+        primary_niche: document.getElementById('primary_niche').value,
+        sub_niches: sub,
+        language: "ar",
+        tone: document.getElementById('tone').value,
+        constraints: {},
+        tiktok_profile_url: null,
+        top_video_urls: [],
+        weak_video_urls: [],
+        past_scripts: []
+      };
+      const data = await postJSON('/v1/onboard', payload);
+      show(data);
+      if(data.creator_id){
+        document.getElementById('creator_id').value = data.creator_id;
+        document.getElementById('creator_id2').value = data.creator_id;
+      }
+    }catch(e){ show(String(e)); }
   }
 
   async function doDailyBrief(){
-    const urls = (document.getElementById("competitor_urls").value || "")
-      .split("\n").map(s => s.trim()).filter(Boolean);
-
-    const body = {
-      creator_id: document.getElementById("creator_id2").value.trim(),
-      competitor_urls: urls,
-      extra_context: document.getElementById("extra_context").value || ""
-    };
-
-    const res = await postJSON("/v1/daily-brief", body);
-    setOut("out_dailybrief", res);
+    try{
+      const payload = {
+        creator_id: document.getElementById('creator_id').value,
+        n_ideas: Number(document.getElementById('n_ideas').value || 3)
+      };
+      const data = await postJSON('/v1/daily-brief', payload);
+      show(data);
+    }catch(e){ show(String(e)); }
   }
 
-  async function doReport(){
-    const cid = document.getElementById("creator_id3").value.trim();
-    const eid = document.getElementById("experiment_id").value.trim();
-    if (!cid || !eid) {
-      setOut("out_report", { ok:false, status: 0, data: { error: "ضع creator_id و experiment_id" } });
-      return;
-    }
-    const res = await getJSON(`/v1/report/${encodeURIComponent(eid)}?creator_id=${encodeURIComponent(cid)}`);
-    setOut("out_report", res);
-  }
-
-  async function copyCreatorId(){
-    const id = document.getElementById("creator_id").value.trim();
-    if (!id) return;
-    try {
-      await navigator.clipboard.writeText(id);
-      alert("تم نسخ creator_id");
-    } catch {
-      alert("لم أستطع النسخ تلقائيًا. انسخه يدويًا.");
-    }
+  async function doBuildPack(){
+    try{
+      const payload = {
+        creator_id: document.getElementById('creator_id2').value,
+        idea_title: document.getElementById('idea_title').value,
+        angle: document.getElementById('angle').value,
+        value_promise: document.getElementById('value_promise').value,
+        preferred_length_sec: Number(document.getElementById('preferred_length_sec').value || 28),
+        mode: document.getElementById('mode').value
+      };
+      const data = await postJSON('/v1/build-pack', payload);
+      show(data);
+    }catch(e){ show(String(e)); }
   }
 </script>
 </body>
