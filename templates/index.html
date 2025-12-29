@@ -1,176 +1,801 @@
 <!doctype html>
-<html lang="ar" dir="rtl">
+<html lang="en" dir="ltr">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>AI Dominator V2 — UI</title>
-  <style>
-    body{font-family:system-ui,Segoe UI,Tahoma,Arial; margin:16px; background:#0b0f14; color:#e8eef6}
-    .card{background:#111826; border:1px solid #233047; border-radius:14px; padding:14px; margin:12px 0}
-    input, textarea, select{width:100%; padding:10px; border-radius:10px; border:1px solid #2b3a55; background:#0b1220; color:#e8eef6}
-    button{padding:10px 14px; border-radius:10px; border:1px solid #2b3a55; background:#17233a; color:#e8eef6; cursor:pointer}
-    button:hover{background:#1f3152}
-    pre{white-space:pre-wrap; background:#060a10; border:1px solid #233047; border-radius:12px; padding:12px; overflow:auto}
-    .row{display:grid; grid-template-columns:1fr 1fr; gap:10px}
-    @media (max-width:900px){ .row{grid-template-columns:1fr} }
-    .hint{opacity:.85; font-size:13px}
-  </style>
+  <title>AI DOMINATOR — Console</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+  <link rel="stylesheet" href="/static/style.css" />
 </head>
+
 <body>
-  <h2>AI Dominator V2 — اختبار API من المتصفح</h2>
-  <div class="hint">هذه الصفحة تعمل عبر POST باستخدام fetch. افتحها من نفس الدومين ثم جرّب الأزرار.</div>
+  <div class="app-shell">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">AD</div>
+        <div class="brand-text">
+          <div class="brand-name">AI DOMINATOR</div>
+          <div class="brand-sub" data-i18n="brand_sub">API Console</div>
+        </div>
+      </div>
 
-  <div class="card">
-    <h3>1) Onboard</h3>
-    <div class="row">
-      <div>
-        <label>Display name</label>
-        <input id="display_name" value="Mohammad" />
+      <nav class="nav">
+        <button class="nav-item active" data-target="panel-onboard">
+          <span class="nav-dot"></span><span data-i18n="nav_onboard">Onboard</span>
+        </button>
+        <button class="nav-item" data-target="panel-build">
+          <span class="nav-dot"></span><span data-i18n="nav_build">Build Pack</span>
+        </button>
+        <button class="nav-item" data-target="panel-brief">
+          <span class="nav-dot"></span><span data-i18n="nav_brief">Daily Brief</span>
+        </button>
+        <button class="nav-item" data-target="panel-metrics">
+          <span class="nav-dot"></span><span data-i18n="nav_metrics">Submit Metrics</span>
+        </button>
+        <button class="nav-item" data-target="panel-report">
+          <span class="nav-dot"></span><span data-i18n="nav_report">Report</span>
+        </button>
+
+        <div class="nav-sep"></div>
+
+        <a class="nav-link" href="/health" target="_blank" rel="noopener">
+          <span class="nav-dot ghost"></span><span data-i18n="nav_health">Health</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-foot">
+        <div class="hint" data-i18n="sidebar_hint">
+          Tip: Use the forms to call the API. Results appear on the right.
+        </div>
       </div>
-      <div>
-        <label>Primary niche</label>
-        <input id="primary_niche" value="التسويق الرقمي" />
+    </aside>
+
+    <!-- Main -->
+    <main class="main">
+      <!-- Top bar -->
+      <header class="topbar">
+        <div class="topbar-left">
+          <div class="page-title" data-i18n="title_console">Console</div>
+          <div class="page-meta">
+            <span class="pill">
+              <span class="pill-dot ok"></span>
+              <span data-i18n="status_ok">Service online</span>
+            </span>
+            <span class="pill mono" id="baseUrlPill"></span>
+          </div>
+        </div>
+
+        <div class="topbar-right">
+          <div class="lang-wrap">
+            <label class="label" for="langSelect" data-i18n="label_language">Language</label>
+            <select id="langSelect" class="select">
+              <option value="en" selected>English</option>
+              <option value="ar">العربية</option>
+              <option value="es">Español</option>
+              <option value="fr">Français</option>
+              <option value="de">Deutsch</option>
+              <option value="pt">Português</option>
+              <option value="hi">हिन्दी</option>
+              <option value="zh">中文 (简体)</option>
+              <option value="ja">日本語</option>
+              <option value="ko">한국어</option>
+              <option value="ru">Русский</option>
+              <option value="tr">Türkçe</option>
+              <option value="id">Bahasa Indonesia</option>
+            </select>
+          </div>
+
+          <label class="switch">
+            <input id="bilingualToggle" type="checkbox" checked />
+            <span class="switch-ui"></span>
+            <span class="switch-text" data-i18n="label_bilingual">Show English helper</span>
+          </label>
+        </div>
+      </header>
+
+      <div class="content">
+        <!-- Left: Forms -->
+        <section class="work">
+          <!-- Onboard -->
+          <article class="panel active" id="panel-onboard">
+            <div class="panel-head">
+              <div>
+                <h2 data-i18n="h_onboard">Onboard</h2>
+                <p class="muted" data-i18n="d_onboard">Create a creator profile and get a creator_id.</p>
+              </div>
+              <div class="endpoint">POST <span class="mono">/v1/onboard</span></div>
+            </div>
+
+            <form class="form" data-endpoint="/v1/onboard" data-method="POST">
+              <div class="grid-2">
+                <div class="field">
+                  <label class="label" data-i18n="f_display_name">Display name</label>
+                  <input class="input" name="display_name" placeholder="Mohammad" required />
+                </div>
+
+                <div class="field">
+                  <label class="label" data-i18n="f_goal">Goal</label>
+                  <select class="select" name="goal">
+                    <option value="followers" selected>followers</option>
+                    <option value="leads">leads</option>
+                    <option value="sales">sales</option>
+                    <option value="authority">authority</option>
+                  </select>
+                </div>
+
+                <div class="field">
+                  <label class="label" data-i18n="f_primary_niche">Primary niche</label>
+                  <input class="input" name="primary_niche" placeholder="Digital marketing" required />
+                </div>
+
+                <div class="field">
+                  <label class="label" data-i18n="f_language">Content language</label>
+                  <select class="select" name="language">
+                    <option value="en" selected>en</option>
+                    <option value="ar">ar</option>
+                    <option value="es">es</option>
+                    <option value="fr">fr</option>
+                    <option value="de">de</option>
+                    <option value="pt">pt</option>
+                    <option value="hi">hi</option>
+                    <option value="zh">zh</option>
+                    <option value="ja">ja</option>
+                    <option value="ko">ko</option>
+                    <option value="ru">ru</option>
+                    <option value="tr">tr</option>
+                    <option value="id">id</option>
+                  </select>
+                </div>
+
+                <div class="field">
+                  <label class="label" data-i18n="f_sub_niches">Sub-niches (comma separated)</label>
+                  <input class="input" name="sub_niches" placeholder="TikTok, Branding, AI" />
+                </div>
+
+                <div class="field">
+                  <label class="label" data-i18n="f_tone">Tone</label>
+                  <select class="select" name="tone">
+                    <option value="educational" selected>educational</option>
+                    <option value="storytelling">storytelling</option>
+                    <option value="humorous">humorous</option>
+                    <option value="direct">direct</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="grid-2">
+                <div class="field">
+                  <label class="label" data-i18n="f_tiktok_url">TikTok profile URL (optional)</label>
+                  <input class="input" name="tiktok_profile_url" placeholder="https://www.tiktok.com/@username" />
+                </div>
+
+                <div class="field">
+                  <label class="label" data-i18n="f_constraints">Constraints JSON (optional)</label>
+                  <textarea class="textarea mono" name="constraints" rows="3" placeholder='{"no_face": false}'></textarea>
+                </div>
+              </div>
+
+              <details class="details">
+                <summary data-i18n="advanced_fields">Advanced fields</summary>
+                <div class="grid-2">
+                  <div class="field">
+                    <label class="label" data-i18n="f_top_videos">Top video URLs (one per line)</label>
+                    <textarea class="textarea mono" name="top_video_urls" rows="4" placeholder="https://..."></textarea>
+                  </div>
+                  <div class="field">
+                    <label class="label" data-i18n="f_weak_videos">Weak video URLs (one per line)</label>
+                    <textarea class="textarea mono" name="weak_video_urls" rows="4" placeholder="https://..."></textarea>
+                  </div>
+                  <div class="field">
+                    <label class="label" data-i18n="f_past_scripts">Past scripts (one per line)</label>
+                    <textarea class="textarea" name="past_scripts" rows="4" placeholder="Script 1..."></textarea>
+                  </div>
+                </div>
+              </details>
+
+              <div class="actions">
+                <button class="btn primary" type="submit" data-i18n="btn_send">Send</button>
+                <button class="btn" type="button" data-action="fill-example" data-example="onboard" data-i18n="btn_example">Fill example</button>
+              </div>
+            </form>
+          </article>
+
+          <!-- Build Pack -->
+          <article class="panel" id="panel-build">
+            <div class="panel-head">
+              <div>
+                <h2 data-i18n="h_build">Build Pack</h2>
+                <p class="muted" data-i18n="d_build">Generate a ready-to-record kit + experiment plan + prompt pack.</p>
+              </div>
+              <div class="endpoint">POST <span class="mono">/v1/build-pack</span></div>
+            </div>
+
+            <form class="form" data-endpoint="/v1/build-pack" data-method="POST">
+              <div class="grid-2">
+                <div class="field">
+                  <label class="label" data-i18n="f_creator_id">creator_id</label>
+                  <input class="input mono" name="creator_id" placeholder="UUID" required />
+                </div>
+
+                <div class="field">
+                  <label class="label" data-i18n="f_mode">Mode</label>
+                  <select class="select" name="mode">
+                    <option value="manual" selected>manual</option>
+                    <option value="tiktok">tiktok</option>
+                    <option value="both">both</option>
+                  </select>
+                </div>
+
+                <div class="field">
+                  <label class="label" data-i18n="f_idea_title">Idea title</label>
+                  <input class="input" name="idea_title" placeholder="3 steps to improve..." required />
+                </div>
+
+                <div class="field">
+                  <label class="label" data-i18n="f_angle">Angle</label>
+                  <input class="input" name="angle" placeholder="Saveable checklist" required />
+                </div>
+
+                <div class="field">
+                  <label class="label" data-i18n="f_value_promise">Value promise</label>
+                  <input class="input" name="value_promise" placeholder="Simple plan: do, measure, iterate." required />
+                </div>
+
+                <div class="field">
+                  <label class="label" data-i18n="f_length">Preferred length (sec)</label>
+                  <input class="input mono" name="preferred_length_sec" type="number" min="10" max="90" value="28" />
+                </div>
+              </div>
+
+              <div class="actions">
+                <button class="btn primary" type="submit" data-i18n="btn_send">Send</button>
+                <button class="btn" type="button" data-action="fill-example" data-example="build" data-i18n="btn_example">Fill example</button>
+              </div>
+            </form>
+          </article>
+
+          <!-- Daily Brief -->
+          <article class="panel" id="panel-brief">
+            <div class="panel-head">
+              <div>
+                <h2 data-i18n="h_brief">Daily Brief</h2>
+                <p class="muted" data-i18n="d_brief">Generate daily ideas (angles + hooks).</p>
+              </div>
+              <div class="endpoint">POST <span class="mono">/v1/daily-brief</span></div>
+            </div>
+
+            <form class="form" data-endpoint="/v1/daily-brief" data-method="POST">
+              <div class="grid-2">
+                <div class="field">
+                  <label class="label" data-i18n="f_creator_id">creator_id</label>
+                  <input class="input mono" name="creator_id" placeholder="UUID" required />
+                </div>
+
+                <div class="field">
+                  <label class="label" data-i18n="f_limit">Ideas limit</label>
+                  <input class="input mono" name="limit" type="number" min="1" max="20" value="5" />
+                </div>
+              </div>
+
+              <div class="actions">
+                <button class="btn primary" type="submit" data-i18n="btn_send">Send</button>
+                <button class="btn" type="button" data-action="fill-example" data-example="brief" data-i18n="btn_example">Fill example</button>
+              </div>
+            </form>
+          </article>
+
+          <!-- Submit Metrics -->
+          <article class="panel" id="panel-metrics">
+            <div class="panel-head">
+              <div>
+                <h2 data-i18n="h_metrics">Submit Metrics</h2>
+                <p class="muted" data-i18n="d_metrics">Send experiment performance metrics (views, likes, shares, etc.).</p>
+              </div>
+              <div class="endpoint">POST <span class="mono">/v1/submit-metrics</span></div>
+            </div>
+
+            <form class="form" data-endpoint="/v1/submit-metrics" data-method="POST">
+              <div class="grid-2">
+                <div class="field">
+                  <label class="label" data-i18n="f_creator_id">creator_id</label>
+                  <input class="input mono" name="creator_id" placeholder="UUID" required />
+                </div>
+
+                <div class="field">
+                  <label class="label" data-i18n="f_experiment_id">experiment_id</label>
+                  <input class="input mono" name="experiment_id" placeholder="UUID" required />
+                </div>
+              </div>
+
+              <div class="field">
+                <label class="label" data-i18n="f_metrics_json">metrics JSON</label>
+                <textarea class="textarea mono" name="metrics" rows="6" placeholder='{"hook":"C","views":1200,"likes":140,"comments":22,"shares":9,"saves":18,"watch_time_avg_sec":9.7}'></textarea>
+              </div>
+
+              <div class="actions">
+                <button class="btn primary" type="submit" data-i18n="btn_send">Send</button>
+                <button class="btn" type="button" data-action="fill-example" data-example="metrics" data-i18n="btn_example">Fill example</button>
+              </div>
+            </form>
+          </article>
+
+          <!-- Report -->
+          <article class="panel" id="panel-report">
+            <div class="panel-head">
+              <div>
+                <h2 data-i18n="h_report">Report</h2>
+                <p class="muted" data-i18n="d_report">Fetch a report for an experiment_id.</p>
+              </div>
+              <div class="endpoint">GET <span class="mono">/v1/report/&lt;experiment_id&gt;?creator_id=...</span></div>
+            </div>
+
+            <form class="form" data-endpoint="/v1/report" data-method="GET">
+              <div class="grid-2">
+                <div class="field">
+                  <label class="label" data-i18n="f_creator_id">creator_id</label>
+                  <input class="input mono" name="creator_id" placeholder="UUID" required />
+                </div>
+
+                <div class="field">
+                  <label class="label" data-i18n="f_experiment_id">experiment_id</label>
+                  <input class="input mono" name="experiment_id" placeholder="UUID" required />
+                </div>
+              </div>
+
+              <div class="actions">
+                <button class="btn primary" type="submit" data-i18n="btn_send">Send</button>
+                <button class="btn" type="button" data-action="fill-example" data-example="report" data-i18n="btn_example">Fill example</button>
+              </div>
+            </form>
+          </article>
+        </section>
+
+        <!-- Right: Output -->
+        <section class="output">
+          <div class="output-head">
+            <div>
+              <div class="output-title" data-i18n="out_title">Response</div>
+              <div class="output-sub muted" id="lastRequestLine" data-i18n="out_sub">No requests yet.</div>
+            </div>
+
+            <div class="output-actions">
+              <button class="btn" id="btnCopy" type="button" data-i18n="btn_copy">Copy</button>
+              <button class="btn" id="btnClear" type="button" data-i18n="btn_clear">Clear</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-row">
+              <div class="k" data-i18n="curl_hint">Quick curl</div>
+              <pre class="mono small" id="curlPreview"></pre>
+            </div>
+          </div>
+
+          <pre class="json mono" id="jsonOut">{}</pre>
+
+          <div class="footnote muted" data-i18n="footnote">
+            If Arabic looks garbled in your terminal, ensure UTF-8 output encoding.
+          </div>
+        </section>
       </div>
-    </div>
-    <div class="row">
-      <div>
-        <label>Goal</label>
-        <select id="goal">
-          <option value="followers" selected>followers</option>
-          <option value="sales">sales</option>
-          <option value="leads">leads</option>
-        </select>
-      </div>
-      <div>
-        <label>Tone</label>
-        <select id="tone">
-          <option value="educational" selected>educational</option>
-          <option value="storytelling">storytelling</option>
-          <option value="humorous">humorous</option>
-        </select>
-      </div>
-    </div>
-    <label>Sub niches (comma separated)</label>
-    <input id="sub_niches" value="TikTok, Branding, AI" />
-    <div style="margin-top:10px">
-      <button onclick="doOnboard()">POST /v1/onboard</button>
-    </div>
+    </main>
   </div>
 
-  <div class="card">
-    <h3>2) Daily Brief</h3>
-    <label>Creator ID</label>
-    <input id="creator_id" placeholder="سيتم تعبئته تلقائيًا بعد Onboard" />
-    <label style="margin-top:10px">n_ideas</label>
-    <input id="n_ideas" type="number" value="3" />
-    <div style="margin-top:10px">
-      <button onclick="doDailyBrief()">POST /v1/daily-brief</button>
-    </div>
-  </div>
+  <script>
+    // ------------------------------
+    // i18n dictionary (UI strings)
+    // English is base; other languages provide key coverage for main UI.
+    // "Bilingual helper" shows English alongside selected language.
+    // ------------------------------
+    const I18N = {
+      en: {
+        brand_sub: "API Console",
+        sidebar_hint: "Tip: Use the forms to call the API. Results appear on the right.",
+        title_console: "Console",
+        status_ok: "Service online",
+        label_language: "Language",
+        label_bilingual: "Show English helper",
 
-  <div class="card">
-    <h3>3) Build Pack</h3>
-    <label>Creator ID</label>
-    <input id="creator_id2" placeholder="انسخ Creator ID هنا" />
-    <label style="margin-top:10px">Idea title</label>
-    <input id="idea_title" value="3 خطوات سريعة لتحسين نتائجك في التسويق الرقمي" />
-    <label style="margin-top:10px">Angle</label>
-    <input id="angle" value="قائمة خطوات قابلة للحفظ" />
-    <label style="margin-top:10px">Value promise</label>
-    <input id="value_promise" value="خطة بسيطة: نفّذ، قِس، عدّل." />
-    <div class="row" style="margin-top:10px">
-      <div>
-        <label>Preferred length (sec)</label>
-        <input id="preferred_length_sec" type="number" value="28" />
-      </div>
-      <div>
-        <label>Mode</label>
-        <select id="mode">
-          <option value="both" selected>both</option>
-          <option value="manual">manual</option>
-        </select>
-      </div>
-    </div>
-    <div style="margin-top:10px">
-      <button onclick="doBuildPack()">POST /v1/build-pack</button>
-    </div>
-  </div>
+        nav_onboard: "Onboard",
+        nav_build: "Build Pack",
+        nav_brief: "Daily Brief",
+        nav_metrics: "Submit Metrics",
+        nav_report: "Report",
+        nav_health: "Health",
 
-  <div class="card">
-    <h3>النتيجة</h3>
-    <pre id="out">—</pre>
-  </div>
+        h_onboard: "Onboard",
+        d_onboard: "Create a creator profile and get a creator_id.",
+        h_build: "Build Pack",
+        d_build: "Generate a ready-to-record kit + experiment plan + prompt pack.",
+        h_brief: "Daily Brief",
+        d_brief: "Generate daily ideas (angles + hooks).",
+        h_metrics: "Submit Metrics",
+        d_metrics: "Send experiment performance metrics (views, likes, shares, etc.).",
+        h_report: "Report",
+        d_report: "Fetch a report for an experiment_id.",
 
-<script>
-  function show(obj){
-    document.getElementById('out').textContent = typeof obj === 'string' ? obj : JSON.stringify(obj, null, 2);
-  }
+        advanced_fields: "Advanced fields",
 
-  async function postJSON(path, body){
-    const res = await fetch(path, {
-      method: 'POST',
-      headers: {'Content-Type':'application/json; charset=utf-8'},
-      body: JSON.stringify(body)
-    });
-    const text = await res.text();
-    let data;
-    try{ data = JSON.parse(text); } catch(e){ data = text; }
-    if(!res.ok){
-      throw new Error((data && data.error) ? data.error : ("HTTP " + res.status));
-    }
-    return data;
-  }
+        f_display_name: "Display name",
+        f_goal: "Goal",
+        f_primary_niche: "Primary niche",
+        f_sub_niches: "Sub-niches (comma separated)",
+        f_language: "Content language",
+        f_tone: "Tone",
+        f_tiktok_url: "TikTok profile URL (optional)",
+        f_constraints: "Constraints JSON (optional)",
+        f_top_videos: "Top video URLs (one per line)",
+        f_weak_videos: "Weak video URLs (one per line)",
+        f_past_scripts: "Past scripts (one per line)",
+        f_creator_id: "creator_id",
+        f_mode: "Mode",
+        f_idea_title: "Idea title",
+        f_angle: "Angle",
+        f_value_promise: "Value promise",
+        f_length: "Preferred length (sec)",
+        f_limit: "Ideas limit",
+        f_experiment_id: "experiment_id",
+        f_metrics_json: "metrics JSON",
 
-  async function doOnboard(){
-    try{
-      const sub = document.getElementById('sub_niches').value.split(',').map(s=>s.trim()).filter(Boolean);
-      const payload = {
-        display_name: document.getElementById('display_name').value,
-        goal: document.getElementById('goal').value,
-        primary_niche: document.getElementById('primary_niche').value,
-        sub_niches: sub,
-        language: "ar",
-        tone: document.getElementById('tone').value,
-        constraints: {},
-        tiktok_profile_url: null,
-        top_video_urls: [],
-        weak_video_urls: [],
-        past_scripts: []
-      };
-      const data = await postJSON('/v1/onboard', payload);
-      show(data);
-      if(data.creator_id){
-        document.getElementById('creator_id').value = data.creator_id;
-        document.getElementById('creator_id2').value = data.creator_id;
+        btn_send: "Send",
+        btn_example: "Fill example",
+        btn_copy: "Copy",
+        btn_clear: "Clear",
+
+        out_title: "Response",
+        out_sub: "No requests yet.",
+        curl_hint: "Quick curl",
+        footnote: "If Arabic looks garbled in your terminal, ensure UTF-8 output encoding."
+      },
+
+      ar: {
+        brand_sub: "لوحة استدعاء API",
+        sidebar_hint: "تلميح: استخدم النماذج لاستدعاء الـ API، وستظهر النتائج على اليمين.",
+        title_console: "لوحة التحكم",
+        status_ok: "الخدمة تعمل",
+        label_language: "اللغة",
+        label_bilingual: "إظهار الإنجليزية كمساعدة",
+
+        nav_onboard: "إنشاء ملف",
+        nav_build: "حزمة إنتاج",
+        nav_brief: "ملخص يومي",
+        nav_metrics: "رفع قياسات",
+        nav_report: "تقرير",
+        nav_health: "الصحة",
+
+        h_onboard: "إنشاء ملف",
+        d_onboard: "إنشاء ملف صانع محتوى والحصول على creator_id.",
+        h_build: "حزمة إنتاج",
+        d_build: "توليد Ready-to-record kit + خطة تجربة + Prompt pack.",
+        h_brief: "ملخص يومي",
+        d_brief: "توليد أفكار يومية (زوايا + Hooks).",
+        h_metrics: "رفع قياسات",
+        d_metrics: "إرسال قياسات الأداء (مشاهدات، إعجابات، مشاركات...).",
+        h_report: "تقرير",
+        d_report: "جلب تقرير تجربة عبر experiment_id.",
+
+        advanced_fields: "حقول متقدمة",
+
+        f_display_name: "الاسم الظاهر",
+        f_goal: "الهدف",
+        f_primary_niche: "النيتش الأساسي",
+        f_sub_niches: "نيتشات فرعية (بفاصلة)",
+        f_language: "لغة المحتوى",
+        f_tone: "النبرة",
+        f_tiktok_url: "رابط تيكتوك (اختياري)",
+        f_constraints: "قيود JSON (اختياري)",
+        f_top_videos: "روابط أفضل فيديوهات (سطر لكل رابط)",
+        f_weak_videos: "روابط فيديوهات ضعيفة (سطر لكل رابط)",
+        f_past_scripts: "سكربتات سابقة (سطر لكل سكربت)",
+        f_creator_id: "creator_id",
+        f_mode: "الوضع",
+        f_idea_title: "عنوان الفكرة",
+        f_angle: "الزاوية",
+        f_value_promise: "وعد القيمة",
+        f_length: "المدة (ثانية)",
+        f_limit: "عدد الأفكار",
+        f_experiment_id: "experiment_id",
+        f_metrics_json: "metrics JSON",
+
+        btn_send: "إرسال",
+        btn_example: "تعبئة مثال",
+        btn_copy: "نسخ",
+        btn_clear: "مسح",
+
+        out_title: "النتيجة",
+        out_sub: "لا توجد طلبات بعد.",
+        curl_hint: "curl سريع",
+        footnote: "إذا ظهر العربي بشكل غير صحيح في الطرفية، فعّل إخراج UTF-8."
       }
-    }catch(e){ show(String(e)); }
-  }
+    };
 
-  async function doDailyBrief(){
-    try{
-      const payload = {
-        creator_id: document.getElementById('creator_id').value,
-        n_ideas: Number(document.getElementById('n_ideas').value || 3)
-      };
-      const data = await postJSON('/v1/daily-brief', payload);
-      show(data);
-    }catch(e){ show(String(e)); }
-  }
+    // Lightweight fallback: if a lang doesn't exist or missing keys => English.
+    function t(key) {
+      const lang = state.lang;
+      const base = I18N.en[key] ?? key;
+      const v = (I18N[lang] && I18N[lang][key]) ? I18N[lang][key] : base;
 
-  async function doBuildPack(){
-    try{
-      const payload = {
-        creator_id: document.getElementById('creator_id2').value,
-        idea_title: document.getElementById('idea_title').value,
-        angle: document.getElementById('angle').value,
-        value_promise: document.getElementById('value_promise').value,
-        preferred_length_sec: Number(document.getElementById('preferred_length_sec').value || 28),
-        mode: document.getElementById('mode').value
+      // bilingual helper: show selected language + English (if not English)
+      if (state.bilingual && lang !== "en") return `${v} — ${base}`;
+      return v;
+    }
+
+    const state = {
+      lang: "en",
+      bilingual: true
+    };
+
+    const $ = (sel) => document.querySelector(sel);
+    const $$ = (sel) => Array.from(document.querySelectorAll(sel));
+
+    function applyDir() {
+      const html = document.documentElement;
+      const isRTL = (state.lang === "ar");
+      html.setAttribute("dir", isRTL ? "rtl" : "ltr");
+      html.setAttribute("lang", state.lang);
+      document.body.classList.toggle("rtl", isRTL);
+    }
+
+    function applyI18n() {
+      $$("[data-i18n]").forEach(el => {
+        const key = el.getAttribute("data-i18n");
+        el.textContent = t(key);
+      });
+      // Keep dynamic line if already changed
+      if ($("#lastRequestLine").dataset.custom === "1") return;
+      $("#lastRequestLine").textContent = t("out_sub");
+    }
+
+    function setActivePanel(id) {
+      $$(".nav-item").forEach(b => b.classList.toggle("active", b.dataset.target === id));
+      $$(".panel").forEach(p => p.classList.toggle("active", p.id === id));
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    function prettyJson(x) {
+      try { return JSON.stringify(x, null, 2); } catch(e) { return String(x); }
+    }
+
+    function safeParseJson(text) {
+      try { return JSON.parse(text); } catch(e) { return null; }
+    }
+
+    function linesToArray(text) {
+      const s = (text || "").trim();
+      if (!s) return [];
+      return s.split(/\r?\n/).map(x => x.trim()).filter(Boolean);
+    }
+
+    function commaToArray(text) {
+      const s = (text || "").trim();
+      if (!s) return [];
+      return s.split(",").map(x => x.trim()).filter(Boolean);
+    }
+
+    function buildCurl(method, endpoint, bodyObj) {
+      const url = `${location.origin}${endpoint}`;
+      if (method.toUpperCase() === "GET") {
+        return `curl -s "${url}"`;
+      }
+      const body = JSON.stringify(bodyObj, null, 2);
+      return `curl -X ${method.toUpperCase()} "${url}" \\\n  -H "Content-Type: application/json" \\\n  -d '${body.replace(/'/g, "\\'")}'`;
+    }
+
+    function setOutput(requestLine, curlText, jsonText) {
+      const lineEl = $("#lastRequestLine");
+      lineEl.textContent = requestLine;
+      lineEl.dataset.custom = "1";
+      $("#curlPreview").textContent = curlText;
+      $("#jsonOut").textContent = jsonText;
+    }
+
+    function setError(requestLine, curlText, errorText) {
+      setOutput(requestLine, curlText, errorText);
+    }
+
+    async function callApi(method, endpoint, payload, query) {
+      const upper = method.toUpperCase();
+      let url = `${location.origin}${endpoint}`;
+
+      if (upper === "GET") {
+        // report: /v1/report/<experiment_id>?creator_id=...
+        const experimentId = (query?.experiment_id || "").trim();
+        const creatorId = (query?.creator_id || "").trim();
+        url = `${location.origin}${endpoint}/${encodeURIComponent(experimentId)}?creator_id=${encodeURIComponent(creatorId)}`;
+      }
+
+      const requestLine = `${upper} ${url.replace(location.origin, "")}`;
+      const curlText = buildCurl(upper, url.replace(location.origin, ""), payload || {});
+      setOutput(requestLine, curlText, t("out_sub"));
+
+      const opts = {
+        method: upper,
+        headers: { "Content-Type": "application/json; charset=utf-8" }
       };
-      const data = await postJSON('/v1/build-pack', payload);
-      show(data);
-    }catch(e){ show(String(e)); }
-  }
-</script>
+      if (upper !== "GET") opts.body = JSON.stringify(payload);
+
+      const res = await fetch(url, opts);
+      const text = await res.text();
+      const parsed = safeParseJson(text);
+
+      if (!res.ok) {
+        const errPayload = parsed ? prettyJson(parsed) : text;
+        throw new Error(`HTTP ${res.status}\n${errPayload}`);
+      }
+      return parsed ?? text;
+    }
+
+    function formToPayload(form, kind) {
+      const fd = new FormData(form);
+      const obj = {};
+      fd.forEach((v, k) => obj[k] = (typeof v === "string" ? v.trim() : v));
+
+      if (kind === "onboard") {
+        obj.sub_niches = commaToArray(obj.sub_niches);
+        obj.constraints = obj.constraints ? (safeParseJson(obj.constraints) || {}) : {};
+        obj.tiktok_profile_url = obj.tiktok_profile_url || null;
+        obj.top_video_urls = linesToArray(obj.top_video_urls);
+        obj.weak_video_urls = linesToArray(obj.weak_video_urls);
+        obj.past_scripts = linesToArray(obj.past_scripts);
+      }
+
+      if (kind === "build") {
+        obj.preferred_length_sec = Number(obj.preferred_length_sec || 28);
+      }
+
+      if (kind === "brief") {
+        obj.limit = Number(obj.limit || 5);
+      }
+
+      if (kind === "metrics") {
+        obj.metrics = obj.metrics ? (safeParseJson(obj.metrics) || {}) : {};
+      }
+
+      return obj;
+    }
+
+    const examples = {
+      onboard: {
+        display_name: "Mohammad",
+        goal: "followers",
+        primary_niche: "Digital marketing",
+        sub_niches: "TikTok, Branding, AI",
+        language: "ar",
+        tone: "educational",
+        constraints: '{"no_face": false}',
+        tiktok_profile_url: "",
+        top_video_urls: "",
+        weak_video_urls: "",
+        past_scripts: ""
+      },
+      build: {
+        creator_id: "PASTE_CREATOR_ID_HERE",
+        idea_title: "3 خطوات سريعة لتحسين نتائجك في التسويق الرقمي",
+        angle: "قائمة خطوات قابلة للحفظ",
+        value_promise: "خطة بسيطة: نفّذ، قِس، عدّل.",
+        preferred_length_sec: "28",
+        mode: "both"
+      },
+      brief: {
+        creator_id: "PASTE_CREATOR_ID_HERE",
+        limit: "5"
+      },
+      metrics: {
+        creator_id: "PASTE_CREATOR_ID_HERE",
+        experiment_id: "PASTE_EXPERIMENT_ID_HERE",
+        metrics: '{"hook":"C","views":1200,"likes":140,"comments":22,"shares":9,"saves":18,"watch_time_avg_sec":9.7}'
+      },
+      report: {
+        creator_id: "PASTE_CREATOR_ID_HERE",
+        experiment_id: "PASTE_EXPERIMENT_ID_HERE"
+      }
+    };
+
+    function fillExample(panelId) {
+      const panel = document.getElementById(panelId);
+      const form = panel.querySelector("form");
+      const exKey = panelId.replace("panel-", "");
+      const map = (exKey === "onboard") ? examples.onboard
+                : (exKey === "build") ? examples.build
+                : (exKey === "brief") ? examples.brief
+                : (exKey === "metrics") ? examples.metrics
+                : examples.report;
+
+      Object.entries(map).forEach(([k, v]) => {
+        const el = form.querySelector(`[name="${k}"]`);
+        if (!el) return;
+        if (el.tagName === "SELECT") {
+          el.value = v;
+        } else {
+          el.value = v;
+        }
+      });
+    }
+
+    // Nav actions
+    $$(".nav-item").forEach(btn => {
+      btn.addEventListener("click", () => setActivePanel(btn.dataset.target));
+    });
+
+    // Form submission
+    $$(".form").forEach(form => {
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const endpoint = form.dataset.endpoint;
+        const method = form.dataset.method || "POST";
+        const panel = form.closest(".panel");
+        const kind = panel.id.replace("panel-", "");
+
+        try {
+          if (kind === "report") {
+            const payload = null;
+            const query = {
+              creator_id: form.querySelector('[name="creator_id"]').value,
+              experiment_id: form.querySelector('[name="experiment_id"]').value
+            };
+            const res = await callApi(method, endpoint, payload, query);
+            setOutput(`${method} /v1/report/${query.experiment_id}?creator_id=...`, `curl -s "${location.origin}/v1/report/${query.experiment_id}?creator_id=${query.creator_id}"`, prettyJson(res));
+            return;
+          }
+
+          const payload = formToPayload(form, kind);
+          const res = await callApi(method, endpoint, payload);
+          setOutput(`${method} ${endpoint}`, buildCurl(method, endpoint, payload), prettyJson(res));
+        } catch (err) {
+          const endpointShown = (kind === "report") ? "/v1/report/<experiment_id>?creator_id=..." : endpoint;
+          setError(`${method} ${endpointShown}`, "", String(err.message || err));
+        }
+      });
+
+      // example fill
+      form.querySelectorAll('[data-action="fill-example"]').forEach(btn => {
+        btn.addEventListener("click", () => {
+          const panel = form.closest(".panel");
+          fillExample(panel.id);
+        });
+      });
+    });
+
+    // Output controls
+    $("#btnCopy").addEventListener("click", async () => {
+      const text = $("#jsonOut").textContent || "";
+      try {
+        await navigator.clipboard.writeText(text);
+        $("#btnCopy").textContent = (state.lang === "ar") ? "تم النسخ" : "Copied";
+        setTimeout(() => $("#btnCopy").textContent = t("btn_copy"), 900);
+      } catch {
+        // noop
+      }
+    });
+
+    $("#btnClear").addEventListener("click", () => {
+      $("#jsonOut").textContent = "{}";
+      $("#curlPreview").textContent = "";
+      $("#lastRequestLine").textContent = t("out_sub");
+      $("#lastRequestLine").dataset.custom = "0";
+    });
+
+    // Language controls
+    $("#langSelect").addEventListener("change", (e) => {
+      state.lang = e.target.value;
+      applyDir();
+      applyI18n();
+    });
+
+    $("#bilingualToggle").addEventListener("change", (e) => {
+      state.bilingual = !!e.target.checked;
+      applyI18n();
+    });
+
+    // init
+    $("#baseUrlPill").textContent = location.origin;
+    applyDir();
+    applyI18n();
+    setOutput("—", "", "{}");
+  </script>
 </body>
 </html>
