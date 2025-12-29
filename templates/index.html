@@ -5,10 +5,32 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>AI DOMINATOR — Console</title>
 
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-
   <link rel="stylesheet" href="/static/style.css" />
+
+  <!-- Minimal extra styling for card-based output (kept inside HTML to avoid editing CSS) -->
+  <style>
+    .cards { display:flex; flex-direction:column; gap:12px; margin:16px; }
+    .card-pro { border:1px solid var(--border); background: rgba(0,0,0,.16); border-radius: var(--radius); overflow:hidden; }
+    .card-pro-h { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; padding:12px 12px 10px 12px; border-bottom:1px solid var(--border); }
+    .card-pro-title { font-weight:800; }
+    .card-pro-sub { font-size:12px; color: var(--muted); margin-top:4px; }
+    .card-pro-actions { display:flex; gap:10px; flex-wrap:wrap; }
+    .card-pro-b { padding:12px; }
+    .chip-row { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+    .chip { font-size:12px; color: var(--muted); border:1px solid var(--border); background: rgba(15,21,34,.35); padding:6px 10px; border-radius:999px; }
+    .split { display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
+    .split-3 { display:grid; grid-template-columns: 1fr 1fr 1fr; gap:12px; }
+    .kline { font-size:12px; color: var(--muted); margin-bottom:8px; }
+    .probox { border:1px solid var(--border); background: rgba(0,0,0,.18); border-radius: 12px; padding:12px; }
+    .probox pre { white-space: pre-wrap; word-break: break-word; }
+    .btn.tiny { padding:8px 10px; border-radius: 12px; font-weight:700; }
+    .details-raw { margin: 0 16px 16px 16px; border:1px solid var(--border); border-radius: var(--radius); background: rgba(0,0,0,.14); overflow:hidden; }
+    .details-raw summary { cursor:pointer; padding:12px; color: var(--muted); }
+    .details-raw .inner { padding: 0 12px 12px 12px; }
+    @media (max-width: 1100px){
+      .split, .split-3 { grid-template-columns: 1fr; }
+    }
+  </style>
 </head>
 
 <body>
@@ -363,19 +385,29 @@
             </div>
 
             <div class="output-actions">
-              <button class="btn" id="btnCopy" type="button" data-i18n="btn_copy">Copy</button>
+              <button class="btn" id="btnCopyAll" type="button">Copy All (Text)</button>
+              <button class="btn" id="btnCopyRaw" type="button">Copy Raw JSON</button>
               <button class="btn" id="btnClear" type="button" data-i18n="btn_clear">Clear</button>
             </div>
           </div>
 
-          <div class="card">
+          <div class="card" style="margin:16px 16px 0 16px;">
             <div class="card-row">
               <div class="k" data-i18n="curl_hint">Quick curl</div>
               <pre class="mono small" id="curlPreview"></pre>
             </div>
           </div>
 
-          <pre class="json mono" id="jsonOut">{}</pre>
+          <!-- Cards output -->
+          <div class="cards" id="cardsOut"></div>
+
+          <!-- Raw JSON (collapsible) -->
+          <details class="details-raw" id="rawBox">
+            <summary>Raw JSON</summary>
+            <div class="inner">
+              <pre class="json mono" id="jsonOut">{}</pre>
+            </div>
+          </details>
 
           <div class="footnote muted" data-i18n="footnote">
             If Arabic looks garbled in your terminal, ensure UTF-8 output encoding.
@@ -388,8 +420,6 @@
   <script>
     // ------------------------------
     // i18n dictionary (UI strings)
-    // English is base; other languages provide key coverage for main UI.
-    // "Bilingual helper" shows English alongside selected language.
     // ------------------------------
     const I18N = {
       en: {
@@ -443,7 +473,6 @@
 
         btn_send: "Send",
         btn_example: "Fill example",
-        btn_copy: "Copy",
         btn_clear: "Clear",
 
         out_title: "Response",
@@ -503,7 +532,6 @@
 
         btn_send: "إرسال",
         btn_example: "تعبئة مثال",
-        btn_copy: "نسخ",
         btn_clear: "مسح",
 
         out_title: "النتيجة",
@@ -513,24 +541,17 @@
       }
     };
 
-    // Lightweight fallback: if a lang doesn't exist or missing keys => English.
+    const state = { lang: "en", bilingual: true };
+    const $ = (sel) => document.querySelector(sel);
+    const $$ = (sel) => Array.from(document.querySelectorAll(sel));
+
     function t(key) {
       const lang = state.lang;
       const base = I18N.en[key] ?? key;
       const v = (I18N[lang] && I18N[lang][key]) ? I18N[lang][key] : base;
-
-      // bilingual helper: show selected language + English (if not English)
       if (state.bilingual && lang !== "en") return `${v} — ${base}`;
       return v;
     }
-
-    const state = {
-      lang: "en",
-      bilingual: true
-    };
-
-    const $ = (sel) => document.querySelector(sel);
-    const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 
     function applyDir() {
       const html = document.documentElement;
@@ -545,7 +566,6 @@
         const key = el.getAttribute("data-i18n");
         el.textContent = t(key);
       });
-      // Keep dynamic line if already changed
       if ($("#lastRequestLine").dataset.custom === "1") return;
       $("#lastRequestLine").textContent = t("out_sub");
     }
@@ -578,44 +598,302 @@
 
     function buildCurl(method, endpoint, bodyObj) {
       const url = `${location.origin}${endpoint}`;
-      if (method.toUpperCase() === "GET") {
-        return `curl -s "${url}"`;
-      }
+      if (method.toUpperCase() === "GET") return `curl -s "${url}"`;
       const body = JSON.stringify(bodyObj, null, 2);
       return `curl -X ${method.toUpperCase()} "${url}" \\\n  -H "Content-Type: application/json" \\\n  -d '${body.replace(/'/g, "\\'")}'`;
     }
 
-    function setOutput(requestLine, curlText, jsonText) {
-      const lineEl = $("#lastRequestLine");
-      lineEl.textContent = requestLine;
-      lineEl.dataset.custom = "1";
-      $("#curlPreview").textContent = curlText;
-      $("#jsonOut").textContent = jsonText;
+    // ------------------------------
+    // Copy helpers
+    // ------------------------------
+    async function copyToClipboard(text, btnEl) {
+      const s = String(text ?? "");
+      try {
+        await navigator.clipboard.writeText(s);
+        if (btnEl) {
+          const old = btnEl.textContent;
+          btnEl.textContent = (state.lang === "ar") ? "تم النسخ" : "Copied";
+          setTimeout(() => btnEl.textContent = old, 900);
+        }
+      } catch (_) {}
     }
 
-    function setError(requestLine, curlText, errorText) {
-      setOutput(requestLine, curlText, errorText);
+    // ------------------------------
+    // Card renderer
+    // ------------------------------
+    function esc(s){ return String(s ?? "").replace(/[&<>"']/g, (m)=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[m])); }
+
+    function makeCard({ title, subtitle, blocks }) {
+      // blocks: [{label, text, copyText}]
+      const card = document.createElement("div");
+      card.className = "card-pro";
+
+      const head = document.createElement("div");
+      head.className = "card-pro-h";
+
+      const left = document.createElement("div");
+      const h = document.createElement("div");
+      h.className = "card-pro-title";
+      h.textContent = title || "—";
+      left.appendChild(h);
+
+      if (subtitle) {
+        const sub = document.createElement("div");
+        sub.className = "card-pro-sub";
+        sub.textContent = subtitle;
+        left.appendChild(sub);
+      }
+
+      const right = document.createElement("div");
+      right.className = "card-pro-actions";
+
+      // card-level copy = concatenation of all blocks
+      const allText = (blocks || []).map(b => `# ${b.label}\n${b.copyText || b.text || ""}`.trim()).filter(Boolean).join("\n\n");
+      const btnAll = document.createElement("button");
+      btnAll.className = "btn tiny";
+      btnAll.type = "button";
+      btnAll.textContent = "Copy card";
+      btnAll.addEventListener("click", () => copyToClipboard(allText, btnAll));
+      right.appendChild(btnAll);
+
+      head.appendChild(left);
+      head.appendChild(right);
+
+      const body = document.createElement("div");
+      body.className = "card-pro-b";
+
+      (blocks || []).forEach((b) => {
+        const wrap = document.createElement("div");
+        wrap.className = "probox";
+        wrap.style.marginBottom = "12px";
+
+        const top = document.createElement("div");
+        top.style.display = "flex";
+        top.style.alignItems = "flex-start";
+        top.style.justifyContent = "space-between";
+        top.style.gap = "10px";
+        top.style.marginBottom = "10px";
+
+        const k = document.createElement("div");
+        k.className = "kline";
+        k.textContent = b.label;
+
+        const btn = document.createElement("button");
+        btn.className = "btn tiny";
+        btn.type = "button";
+        btn.textContent = "Copy";
+        btn.addEventListener("click", () => copyToClipboard((b.copyText ?? b.text ?? ""), btn));
+
+        top.appendChild(k);
+        top.appendChild(btn);
+
+        const pre = document.createElement("pre");
+        pre.className = "mono";
+        pre.textContent = (b.text ?? "");
+
+        wrap.appendChild(top);
+        wrap.appendChild(pre);
+
+        body.appendChild(wrap);
+      });
+
+      card.appendChild(head);
+      card.appendChild(body);
+      return card;
     }
 
+    function joinList(arr, bullet="- ") {
+      const a = Array.isArray(arr) ? arr : [];
+      return a.map(x => `${bullet}${x}`).join("\n");
+    }
+
+    function formatTimeline(tl) {
+      if (!tl || !Array.isArray(tl.sections)) return "";
+      const lines = [];
+      lines.push(`video_seconds: ${tl.video_seconds ?? ""}`.trim());
+      lines.push("");
+      tl.sections.forEach((s, i) => {
+        lines.push(`[${i+1}] ${s.type || "section"} (${s.t_start}s → ${s.t_end}s)`);
+        if (s.onscreen) lines.push(`onscreen: ${s.onscreen}`);
+        if (s.text) lines.push(`text: ${s.text}`);
+        lines.push("");
+      });
+      return lines.join("\n").trim();
+    }
+
+    function extractArtifacts(resp) {
+      // Normal shape:
+      // { artifacts:[{type, payload}], experiment_id, predicted }
+      const artifacts = Array.isArray(resp?.artifacts) ? resp.artifacts : [];
+      const byType = {};
+      artifacts.forEach(a => { if (a?.type) byType[a.type] = a.payload; });
+      return { byType, artifacts };
+    }
+
+    function buildCopyAllText(resp) {
+      const { byType } = extractArtifacts(resp);
+      const out = [];
+
+      if (resp?.experiment_id) out.push(`experiment_id: ${resp.experiment_id}`);
+
+      if (resp?.predicted?.scores) {
+        const s = resp.predicted.scores;
+        out.push(`predicted_scores: A=${s.A ?? ""}, B=${s.B ?? ""}, C=${s.C ?? ""}`);
+      }
+
+      const kit = byType.ready_to_record_kit;
+      if (kit) {
+        out.push("");
+        out.push("== READY TO RECORD KIT ==");
+
+        if (kit.title) out.push(`title: ${kit.title}`);
+        if (kit.caption) out.push(`caption:\n${kit.caption}`);
+        if (Array.isArray(kit.hashtags)) out.push(`hashtags:\n${kit.hashtags.join(" ")}`);
+        if (kit.hooks) {
+          out.push("hooks:");
+          ["A","B","C"].forEach(k => {
+            if (!kit.hooks[k]) return;
+            out.push(`- ${k}: ${kit.hooks[k].hook_text || ""}`);
+          });
+        }
+        if (kit.script_teleprompter) out.push(`script_teleprompter:\n${kit.script_teleprompter}`);
+        if (kit.edit_cues) out.push(`edit_cues:\n${joinList(kit.edit_cues)}`);
+        if (kit.shot_list) out.push(`shot_list:\n${joinList(kit.shot_list)}`);
+        if (kit.timeline) out.push(`timeline:\n${formatTimeline(kit.timeline)}`);
+      }
+
+      const plan = byType.experiment_plan;
+      if (plan) {
+        out.push("");
+        out.push("== EXPERIMENT PLAN ==");
+        if (plan.measurement_points) out.push(`measurement_points:\n${joinList(plan.measurement_points)}`);
+        if (plan.what_to_test) out.push(`what_to_test:\n${joinList(plan.what_to_test)}`);
+        if (plan.next_best_action) out.push(`next_best_action:\n${plan.next_best_action}`);
+        if (plan.win_function) out.push(`win_function:\n${prettyJson(plan.win_function)}`);
+      }
+
+      const pack = byType.prompt_pack;
+      if (pack?.prompts) {
+        out.push("");
+        out.push("== PROMPT PACK ==");
+        Object.entries(pack.prompts).forEach(([k,v]) => {
+          out.push(`${k}:\n${v}`);
+          out.push("");
+        });
+      }
+
+      return out.join("\n").trim();
+    }
+
+    function renderResponseCards(resp) {
+      const cardsOut = $("#cardsOut");
+      cardsOut.innerHTML = "";
+
+      // Raw JSON
+      $("#jsonOut").textContent = prettyJson(resp);
+
+      const { byType } = extractArtifacts(resp);
+      const kit = byType.ready_to_record_kit;
+      const plan = byType.experiment_plan;
+      const pack = byType.prompt_pack;
+
+      // Summary card
+      const sumLines = [];
+      if (resp?.experiment_id) sumLines.push(`experiment_id: ${resp.experiment_id}`);
+      if (kit?.id) sumLines.push(`artifact_id: ${kit.id}`);
+      if (kit?.title) sumLines.push(`title: ${kit.title}`);
+      if (resp?.predicted?.note) sumLines.push(`note: ${resp.predicted.note}`);
+      if (resp?.predicted?.scores) {
+        const s = resp.predicted.scores;
+        sumLines.push(`scores: A=${s.A ?? ""} | B=${s.B ?? ""} | C=${s.C ?? ""}`);
+      }
+      if (kit?.keywords) sumLines.push(`keywords: ${(kit.keywords || []).join(", ")}`);
+
+      cardsOut.appendChild(makeCard({
+        title: "Summary",
+        subtitle: "High-level identifiers and predicted score",
+        blocks: [
+          { label: "Overview", text: sumLines.join("\n"), copyText: sumLines.join("\n") }
+        ]
+      }));
+
+      // Ready-to-record kit
+      if (kit) {
+        const hashtagsText = Array.isArray(kit.hashtags) ? kit.hashtags.join(" ") : "";
+        const hooksText = kit.hooks
+          ? ["A","B","C"].map(k => kit.hooks[k] ? `${k}) ${kit.hooks[k].hook_text}\n   onscreen: ${kit.hooks[k].onscreen_text}` : "").filter(Boolean).join("\n\n")
+          : "";
+
+        const timelineText = formatTimeline(kit.timeline);
+
+        cardsOut.appendChild(makeCard({
+          title: "Ready-to-Record Kit",
+          subtitle: kit.title || "",
+          blocks: [
+            { label: "Caption", text: kit.caption || "", copyText: kit.caption || "" },
+            { label: "Hashtags", text: hashtagsText, copyText: hashtagsText },
+            { label: "Hooks (A/B/C)", text: hooksText, copyText: hooksText },
+            { label: "Script (Teleprompter)", text: kit.script_teleprompter || "", copyText: kit.script_teleprompter || "" },
+            { label: "Edit Cues", text: joinList(kit.edit_cues), copyText: joinList(kit.edit_cues) },
+            { label: "Shot List", text: joinList(kit.shot_list), copyText: joinList(kit.shot_list) },
+            { label: "Timeline", text: timelineText, copyText: timelineText }
+          ].filter(b => (b.text || "").trim().length > 0)
+        }));
+      }
+
+      // Experiment plan
+      if (plan) {
+        const winFn = plan.win_function ? prettyJson(plan.win_function) : "";
+        cardsOut.appendChild(makeCard({
+          title: "Experiment Plan",
+          subtitle: "What to test + measurement plan",
+          blocks: [
+            { label: "Measurement points", text: joinList(plan.measurement_points), copyText: joinList(plan.measurement_points) },
+            { label: "What to test", text: joinList(plan.what_to_test), copyText: joinList(plan.what_to_test) },
+            { label: "Next best action", text: plan.next_best_action || "", copyText: plan.next_best_action || "" },
+            { label: "Win function", text: winFn, copyText: winFn }
+          ].filter(b => (b.text || "").trim().length > 0)
+        }));
+      }
+
+      // Prompt pack
+      if (pack?.prompts) {
+        const blocks = Object.entries(pack.prompts).map(([k,v]) => {
+          const label = k.replace(/_/g, " ").toUpperCase();
+          return { label, text: v, copyText: v };
+        }).filter(b => (b.text || "").trim().length > 0);
+
+        cardsOut.appendChild(makeCard({
+          title: "Prompt Pack",
+          subtitle: pack.title || "",
+          blocks
+        }));
+      }
+
+      // If nothing recognized, show fallback
+      if (!kit && !plan && !pack) {
+        cardsOut.appendChild(makeCard({
+          title: "Response",
+          subtitle: "Unrecognized payload shape — raw JSON is available below",
+          blocks: [{ label: "Raw", text: prettyJson(resp), copyText: prettyJson(resp) }]
+        }));
+      }
+    }
+
+    // ------------------------------
+    // API caller
+    // ------------------------------
     async function callApi(method, endpoint, payload, query) {
       const upper = method.toUpperCase();
       let url = `${location.origin}${endpoint}`;
 
       if (upper === "GET") {
-        // report: /v1/report/<experiment_id>?creator_id=...
         const experimentId = (query?.experiment_id || "").trim();
         const creatorId = (query?.creator_id || "").trim();
         url = `${location.origin}${endpoint}/${encodeURIComponent(experimentId)}?creator_id=${encodeURIComponent(creatorId)}`;
       }
 
-      const requestLine = `${upper} ${url.replace(location.origin, "")}`;
-      const curlText = buildCurl(upper, url.replace(location.origin, ""), payload || {});
-      setOutput(requestLine, curlText, t("out_sub"));
-
-      const opts = {
-        method: upper,
-        headers: { "Content-Type": "application/json; charset=utf-8" }
-      };
+      const opts = { method: upper, headers: { "Content-Type": "application/json; charset=utf-8" } };
       if (upper !== "GET") opts.body = JSON.stringify(payload);
 
       const res = await fetch(url, opts);
@@ -627,6 +905,22 @@
         throw new Error(`HTTP ${res.status}\n${errPayload}`);
       }
       return parsed ?? text;
+    }
+
+    function setOutput(requestLine, curlText, respObjOrText) {
+      const lineEl = $("#lastRequestLine");
+      lineEl.textContent = requestLine;
+      lineEl.dataset.custom = "1";
+      $("#curlPreview").textContent = curlText;
+
+      // Render cards if JSON; otherwise show as raw
+      const resp = (typeof respObjOrText === "object") ? respObjOrText : { raw: String(respObjOrText ?? "") };
+      renderResponseCards(resp);
+    }
+
+    function setError(requestLine, curlText, errorText) {
+      setOutput(requestLine, curlText, { error: String(errorText ?? "Unknown error") });
+      $("#rawBox").open = true;
     }
 
     function formToPayload(form, kind) {
@@ -643,18 +937,9 @@
         obj.past_scripts = linesToArray(obj.past_scripts);
       }
 
-      if (kind === "build") {
-        obj.preferred_length_sec = Number(obj.preferred_length_sec || 28);
-      }
-
-      if (kind === "brief") {
-        obj.limit = Number(obj.limit || 5);
-      }
-
-      if (kind === "metrics") {
-        obj.metrics = obj.metrics ? (safeParseJson(obj.metrics) || {}) : {};
-      }
-
+      if (kind === "build") obj.preferred_length_sec = Number(obj.preferred_length_sec || 28);
+      if (kind === "brief") obj.limit = Number(obj.limit || 5);
+      if (kind === "metrics") obj.metrics = obj.metrics ? (safeParseJson(obj.metrics) || {}) : {};
       return obj;
     }
 
@@ -680,19 +965,13 @@
         preferred_length_sec: "28",
         mode: "both"
       },
-      brief: {
-        creator_id: "PASTE_CREATOR_ID_HERE",
-        limit: "5"
-      },
+      brief: { creator_id: "PASTE_CREATOR_ID_HERE", limit: "5" },
       metrics: {
         creator_id: "PASTE_CREATOR_ID_HERE",
         experiment_id: "PASTE_EXPERIMENT_ID_HERE",
         metrics: '{"hook":"C","views":1200,"likes":140,"comments":22,"shares":9,"saves":18,"watch_time_avg_sec":9.7}'
       },
-      report: {
-        creator_id: "PASTE_CREATOR_ID_HERE",
-        experiment_id: "PASTE_EXPERIMENT_ID_HERE"
-      }
+      report: { creator_id: "PASTE_CREATOR_ID_HERE", experiment_id: "PASTE_EXPERIMENT_ID_HERE" }
     };
 
     function fillExample(panelId) {
@@ -708,18 +987,12 @@
       Object.entries(map).forEach(([k, v]) => {
         const el = form.querySelector(`[name="${k}"]`);
         if (!el) return;
-        if (el.tagName === "SELECT") {
-          el.value = v;
-        } else {
-          el.value = v;
-        }
+        el.value = v;
       });
     }
 
     // Nav actions
-    $$(".nav-item").forEach(btn => {
-      btn.addEventListener("click", () => setActivePanel(btn.dataset.target));
-    });
+    $$(".nav-item").forEach(btn => btn.addEventListener("click", () => setActivePanel(btn.dataset.target)));
 
     // Form submission
     $$(".form").forEach(form => {
@@ -732,26 +1005,26 @@
 
         try {
           if (kind === "report") {
-            const payload = null;
             const query = {
               creator_id: form.querySelector('[name="creator_id"]').value,
               experiment_id: form.querySelector('[name="experiment_id"]').value
             };
-            const res = await callApi(method, endpoint, payload, query);
-            setOutput(`${method} /v1/report/${query.experiment_id}?creator_id=...`, `curl -s "${location.origin}/v1/report/${query.experiment_id}?creator_id=${query.creator_id}"`, prettyJson(res));
+            const urlShown = `${method} /v1/report/${query.experiment_id}?creator_id=...`;
+            const curlText = `curl -s "${location.origin}/v1/report/${query.experiment_id}?creator_id=${query.creator_id}"`;
+            const res = await callApi(method, endpoint, null, query);
+            setOutput(urlShown, curlText, res);
             return;
           }
 
           const payload = formToPayload(form, kind);
+          const curlText = buildCurl(method, endpoint, payload);
           const res = await callApi(method, endpoint, payload);
-          setOutput(`${method} ${endpoint}`, buildCurl(method, endpoint, payload), prettyJson(res));
+          setOutput(`${method} ${endpoint}`, curlText, res);
         } catch (err) {
-          const endpointShown = (kind === "report") ? "/v1/report/<experiment_id>?creator_id=..." : endpoint;
-          setError(`${method} ${endpointShown}`, "", String(err.message || err));
+          setError(`${method} ${endpoint}`, "", String(err.message || err));
         }
       });
 
-      // example fill
       form.querySelectorAll('[data-action="fill-example"]').forEach(btn => {
         btn.addEventListener("click", () => {
           const panel = form.closest(".panel");
@@ -761,22 +1034,23 @@
     });
 
     // Output controls
-    $("#btnCopy").addEventListener("click", async () => {
-      const text = $("#jsonOut").textContent || "";
-      try {
-        await navigator.clipboard.writeText(text);
-        $("#btnCopy").textContent = (state.lang === "ar") ? "تم النسخ" : "Copied";
-        setTimeout(() => $("#btnCopy").textContent = t("btn_copy"), 900);
-      } catch {
-        // noop
-      }
-    });
-
     $("#btnClear").addEventListener("click", () => {
+      $("#cardsOut").innerHTML = "";
       $("#jsonOut").textContent = "{}";
       $("#curlPreview").textContent = "";
       $("#lastRequestLine").textContent = t("out_sub");
       $("#lastRequestLine").dataset.custom = "0";
+      $("#rawBox").open = false;
+    });
+
+    $("#btnCopyRaw").addEventListener("click", (e) => {
+      copyToClipboard($("#jsonOut").textContent || "{}", e.target);
+    });
+
+    $("#btnCopyAll").addEventListener("click", (e) => {
+      const raw = safeParseJson($("#jsonOut").textContent || "{}") || {};
+      const all = buildCopyAllText(raw);
+      copyToClipboard(all || ($("#jsonOut").textContent || "{}"), e.target);
     });
 
     // Language controls
@@ -795,7 +1069,7 @@
     $("#baseUrlPill").textContent = location.origin;
     applyDir();
     applyI18n();
-    setOutput("—", "", "{}");
+    setOutput("—", "", {});
   </script>
 </body>
 </html>
