@@ -3,1073 +3,623 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>AI DOMINATOR — Console</title>
-
+  <title>AI DOMINATOR — Publisher</title>
   <link rel="stylesheet" href="/static/style.css" />
 
-  <!-- Minimal extra styling for card-based output (kept inside HTML to avoid editing CSS) -->
   <style>
-    .cards { display:flex; flex-direction:column; gap:12px; margin:16px; }
-    .card-pro { border:1px solid var(--border); background: rgba(0,0,0,.16); border-radius: var(--radius); overflow:hidden; }
-    .card-pro-h { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; padding:12px 12px 10px 12px; border-bottom:1px solid var(--border); }
-    .card-pro-title { font-weight:800; }
-    .card-pro-sub { font-size:12px; color: var(--muted); margin-top:4px; }
-    .card-pro-actions { display:flex; gap:10px; flex-wrap:wrap; }
-    .card-pro-b { padding:12px; }
-    .chip-row { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+    /* Layout */
+    .content { display:grid; grid-template-columns: 420px 1fr; gap:16px; padding:16px; }
+    @media (max-width: 1100px){ .content { grid-template-columns: 1fr; } }
+
+    /* Panels */
+    .panel { border:1px solid var(--border); border-radius: var(--radius); background: rgba(0,0,0,.14); overflow:hidden; }
+    .panel-h { padding:14px 14px 10px 14px; border-bottom:1px solid var(--border); display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+    .panel-h h2 { margin:0; font-size:16px; }
+    .panel-h .sub { margin-top:6px; font-size:12px; color: var(--muted); }
+    .panel-b { padding:14px; display:flex; flex-direction:column; gap:12px; }
+
+    /* Inputs */
+    .field { display:flex; flex-direction:column; gap:6px; }
+    .label { font-size:12px; color: var(--muted); }
+    .grid2 { display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
+    @media (max-width: 520px){ .grid2 { grid-template-columns:1fr; } }
+
+    /* Output blocks */
+    .out { display:flex; flex-direction:column; gap:12px; }
+    .card { border:1px solid var(--border); border-radius: var(--radius); background: rgba(0,0,0,.12); overflow:hidden; }
+    .card-h { padding:12px 12px 10px 12px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; gap:10px; }
+    .card-h .t { font-weight:800; }
+    .card-h .m { font-size:12px; color: var(--muted); margin-top:4px; }
+    .card-b { padding:12px; display:flex; flex-direction:column; gap:10px; }
+
+    .box { border:1px solid var(--border); background: rgba(0,0,0,.16); border-radius: 12px; padding:12px; }
+    .box-top { display:flex; justify-content:space-between; gap:10px; align-items:flex-start; margin-bottom:10px; }
+    .box-top .k { font-size:12px; color: var(--muted); }
+    pre { margin:0; white-space: pre-wrap; word-break: break-word; }
+    .chips { display:flex; flex-wrap:wrap; gap:8px; }
     .chip { font-size:12px; color: var(--muted); border:1px solid var(--border); background: rgba(15,21,34,.35); padding:6px 10px; border-radius:999px; }
-    .split { display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
-    .split-3 { display:grid; grid-template-columns: 1fr 1fr 1fr; gap:12px; }
-    .kline { font-size:12px; color: var(--muted); margin-bottom:8px; }
-    .probox { border:1px solid var(--border); background: rgba(0,0,0,.18); border-radius: 12px; padding:12px; }
-    .probox pre { white-space: pre-wrap; word-break: break-word; }
-    .btn.tiny { padding:8px 10px; border-radius: 12px; font-weight:700; }
-    .details-raw { margin: 0 16px 16px 16px; border:1px solid var(--border); border-radius: var(--radius); background: rgba(0,0,0,.14); overflow:hidden; }
-    .details-raw summary { cursor:pointer; padding:12px; color: var(--muted); }
-    .details-raw .inner { padding: 0 12px 12px 12px; }
-    @media (max-width: 1100px){
-      .split, .split-3 { grid-template-columns: 1fr; }
-    }
+
+    /* Header */
+    .topbar { display:flex; justify-content:space-between; align-items:center; padding:14px 16px; border-bottom:1px solid var(--border); }
+    .topbar .title { font-weight:900; }
+    .pill { display:inline-flex; align-items:center; gap:8px; border:1px solid var(--border); background: rgba(0,0,0,.12); padding:6px 10px; border-radius: 999px; font-size:12px; color: var(--muted); }
+    .pill-dot { width:8px; height:8px; border-radius:999px; background:#22c55e; display:inline-block; }
+    .actions { display:flex; gap:10px; flex-wrap:wrap; }
+    .btn.small { padding:8px 10px; border-radius: 12px; font-weight:700; }
+    .muted { color: var(--muted); }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+    .hint { font-size:12px; color: var(--muted); line-height:1.5; }
+    .divider { height:1px; background: var(--border); opacity:.8; margin:6px 0; }
   </style>
 </head>
 
 <body>
-  <div class="app-shell">
-    <!-- Sidebar -->
-    <aside class="sidebar">
-      <div class="brand">
-        <div class="brand-mark">AD</div>
-        <div class="brand-text">
-          <div class="brand-name">AI DOMINATOR</div>
-          <div class="brand-sub" data-i18n="brand_sub">API Console</div>
+  <header class="topbar">
+    <div>
+      <div class="title">AI DOMINATOR — Publisher</div>
+      <div style="display:flex; gap:10px; margin-top:8px; flex-wrap:wrap;">
+        <span class="pill"><span class="pill-dot"></span><span id="svcLine">Service online</span></span>
+        <span class="pill mono" id="baseUrlPill"></span>
+      </div>
+    </div>
+
+    <div class="actions">
+      <label class="pill" style="gap:10px;">
+        <span class="muted">UI</span>
+        <select id="uiLang" class="select" style="min-width:160px;">
+          <option value="en" selected>English</option>
+          <option value="ar">العربية</option>
+          <option value="es">Español</option>
+          <option value="fr">Français</option>
+          <option value="de">Deutsch</option>
+          <option value="pt">Português</option>
+          <option value="tr">Türkçe</option>
+          <option value="ru">Русский</option>
+          <option value="id">Bahasa Indonesia</option>
+        </select>
+      </label>
+    </div>
+  </header>
+
+  <div class="content">
+    <!-- LEFT: minimal inputs -->
+    <section class="panel">
+      <div class="panel-h">
+        <div>
+          <h2>Generate Pack</h2>
+          <div class="sub">Minimal inputs. Everything else uses smart defaults.</div>
         </div>
+        <div class="pill mono">POST /v1/build-pack</div>
       </div>
 
-      <nav class="nav">
-        <button class="nav-item active" data-target="panel-onboard">
-          <span class="nav-dot"></span><span data-i18n="nav_onboard">Onboard</span>
-        </button>
-        <button class="nav-item" data-target="panel-build">
-          <span class="nav-dot"></span><span data-i18n="nav_build">Build Pack</span>
-        </button>
-        <button class="nav-item" data-target="panel-brief">
-          <span class="nav-dot"></span><span data-i18n="nav_brief">Daily Brief</span>
-        </button>
-        <button class="nav-item" data-target="panel-metrics">
-          <span class="nav-dot"></span><span data-i18n="nav_metrics">Submit Metrics</span>
-        </button>
-        <button class="nav-item" data-target="panel-report">
-          <span class="nav-dot"></span><span data-i18n="nav_report">Report</span>
-        </button>
+      <div class="panel-b">
+        <div class="hint">
+          Required: <b>creator_id</b> + <b>idea</b> + <b>value</b>. <br/>
+          Optional: angle + length. Mode defaults to <span class="mono">both</span>.
+        </div>
 
-        <div class="nav-sep"></div>
+        <div class="field">
+          <label class="label">creator_id</label>
+          <input id="creatorId" class="input mono" placeholder="UUID" />
+        </div>
 
-        <a class="nav-link" href="/health" target="_blank" rel="noopener">
-          <span class="nav-dot ghost"></span><span data-i18n="nav_health">Health</span>
-        </a>
-      </nav>
+        <div class="field">
+          <label class="label">Idea title</label>
+          <input id="ideaTitle" class="input" placeholder="3 خطوات سريعة لتحسين نتائجك في التسويق الرقمي" />
+        </div>
 
-      <div class="sidebar-foot">
-        <div class="hint" data-i18n="sidebar_hint">
-          Tip: Use the forms to call the API. Results appear on the right.
+        <div class="field">
+          <label class="label">Value promise</label>
+          <input id="valuePromise" class="input" placeholder="خطة بسيطة: نفّذ، قِس، عدّل." />
+        </div>
+
+        <div class="grid2">
+          <div class="field">
+            <label class="label">Angle (optional)</label>
+            <input id="angle" class="input" placeholder="قائمة خطوات قابلة للحفظ" />
+          </div>
+          <div class="field">
+            <label class="label">Length (sec)</label>
+            <input id="lengthSec" class="input mono" type="number" min="10" max="90" value="28" />
+          </div>
+        </div>
+
+        <details class="details">
+          <summary>Advanced (hidden defaults)</summary>
+          <div class="hint" style="margin-top:10px;">
+            These are auto-filled in the background:
+            <div class="divider"></div>
+            <div class="mono">
+              mode = "both"<br/>
+              hooks = A/B/C from engine<br/>
+              script/timeline generation = enabled<br/>
+              publish_text language = creator profile language
+            </div>
+          </div>
+        </details>
+
+        <div class="actions" style="margin-top:6px;">
+          <button id="btnGenerate" class="btn primary" type="button">Generate</button>
+          <button id="btnExample" class="btn" type="button">Fill example</button>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="hint">
+          After publishing on TikTok, use <span class="mono">/v1/submit-metrics</span> to feed results back and get an optimized Part 2.
         </div>
       </div>
-    </aside>
+    </section>
 
-    <!-- Main -->
-    <main class="main">
-      <!-- Top bar -->
-      <header class="topbar">
-        <div class="topbar-left">
-          <div class="page-title" data-i18n="title_console">Console</div>
-          <div class="page-meta">
-            <span class="pill">
-              <span class="pill-dot ok"></span>
-              <span data-i18n="status_ok">Service online</span>
-            </span>
-            <span class="pill mono" id="baseUrlPill"></span>
+    <!-- RIGHT: publish-ready outputs -->
+    <section class="out">
+      <div class="panel">
+        <div class="panel-h">
+          <div>
+            <h2>Publish-ready Output</h2>
+            <div class="sub" id="reqLine">No requests yet.</div>
+          </div>
+          <div class="actions">
+            <button id="copyAllText" class="btn small" type="button">Copy All</button>
+            <button id="copyRaw" class="btn small" type="button">Copy Raw JSON</button>
+            <button id="clearOut" class="btn small" type="button">Clear</button>
           </div>
         </div>
 
-        <div class="topbar-right">
-          <div class="lang-wrap">
-            <label class="label" for="langSelect" data-i18n="label_language">Language</label>
-            <select id="langSelect" class="select">
-              <option value="en" selected>English</option>
-              <option value="ar">العربية</option>
-              <option value="es">Español</option>
-              <option value="fr">Français</option>
-              <option value="de">Deutsch</option>
-              <option value="pt">Português</option>
-              <option value="hi">हिन्दी</option>
-              <option value="zh">中文 (简体)</option>
-              <option value="ja">日本語</option>
-              <option value="ko">한국어</option>
-              <option value="ru">Русский</option>
-              <option value="tr">Türkçe</option>
-              <option value="id">Bahasa Indonesia</option>
-            </select>
+        <div class="panel-b">
+          <!-- 1) VEO3 -->
+          <div class="card" id="cardVeo">
+            <div class="card-h">
+              <div>
+                <div class="t">1) VEO3 Video Prompt (8s blocks)</div>
+                <div class="m">Copy each block into VEO3. Audio + VO + SFX included. No on-screen text.</div>
+              </div>
+              <button class="btn small" type="button" id="copyVeoAll">Copy VEO3 All</button>
+            </div>
+            <div class="card-b" id="veoBlocks"></div>
           </div>
 
-          <label class="switch">
-            <input id="bilingualToggle" type="checkbox" checked />
-            <span class="switch-ui"></span>
-            <span class="switch-text" data-i18n="label_bilingual">Show English helper</span>
-          </label>
-        </div>
-      </header>
-
-      <div class="content">
-        <!-- Left: Forms -->
-        <section class="work">
-          <!-- Onboard -->
-          <article class="panel active" id="panel-onboard">
-            <div class="panel-head">
+          <!-- 2) TikTok caption -->
+          <div class="card" id="cardTt">
+            <div class="card-h">
               <div>
-                <h2 data-i18n="h_onboard">Onboard</h2>
-                <p class="muted" data-i18n="d_onboard">Create a creator profile and get a creator_id.</p>
+                <div class="t">2) TikTok Caption (localized)</div>
+                <div class="m">Caption language follows user/creator language. Trending hashtags are injected at publish-time.</div>
               </div>
-              <div class="endpoint">POST <span class="mono">/v1/onboard</span></div>
+              <button class="btn small" type="button" id="copyCaption">Copy Caption</button>
             </div>
-
-            <form class="form" data-endpoint="/v1/onboard" data-method="POST">
-              <div class="grid-2">
-                <div class="field">
-                  <label class="label" data-i18n="f_display_name">Display name</label>
-                  <input class="input" name="display_name" placeholder="Mohammad" required />
+            <div class="card-b">
+              <div class="box">
+                <div class="box-top">
+                  <div class="k">Caption text</div>
+                  <button class="btn small" type="button" id="copyCaptionText">Copy</button>
                 </div>
-
-                <div class="field">
-                  <label class="label" data-i18n="f_goal">Goal</label>
-                  <select class="select" name="goal">
-                    <option value="followers" selected>followers</option>
-                    <option value="leads">leads</option>
-                    <option value="sales">sales</option>
-                    <option value="authority">authority</option>
-                  </select>
-                </div>
-
-                <div class="field">
-                  <label class="label" data-i18n="f_primary_niche">Primary niche</label>
-                  <input class="input" name="primary_niche" placeholder="Digital marketing" required />
-                </div>
-
-                <div class="field">
-                  <label class="label" data-i18n="f_language">Content language</label>
-                  <select class="select" name="language">
-                    <option value="en" selected>en</option>
-                    <option value="ar">ar</option>
-                    <option value="es">es</option>
-                    <option value="fr">fr</option>
-                    <option value="de">de</option>
-                    <option value="pt">pt</option>
-                    <option value="hi">hi</option>
-                    <option value="zh">zh</option>
-                    <option value="ja">ja</option>
-                    <option value="ko">ko</option>
-                    <option value="ru">ru</option>
-                    <option value="tr">tr</option>
-                    <option value="id">id</option>
-                  </select>
-                </div>
-
-                <div class="field">
-                  <label class="label" data-i18n="f_sub_niches">Sub-niches (comma separated)</label>
-                  <input class="input" name="sub_niches" placeholder="TikTok, Branding, AI" />
-                </div>
-
-                <div class="field">
-                  <label class="label" data-i18n="f_tone">Tone</label>
-                  <select class="select" name="tone">
-                    <option value="educational" selected>educational</option>
-                    <option value="storytelling">storytelling</option>
-                    <option value="humorous">humorous</option>
-                    <option value="direct">direct</option>
-                  </select>
-                </div>
+                <pre class="mono" id="captionText">—</pre>
               </div>
 
-              <div class="grid-2">
-                <div class="field">
-                  <label class="label" data-i18n="f_tiktok_url">TikTok profile URL (optional)</label>
-                  <input class="input" name="tiktok_profile_url" placeholder="https://www.tiktok.com/@username" />
-                </div>
-
-                <div class="field">
-                  <label class="label" data-i18n="f_constraints">Constraints JSON (optional)</label>
-                  <textarea class="textarea mono" name="constraints" rows="3" placeholder='{"no_face": false}'></textarea>
-                </div>
-              </div>
-
-              <details class="details">
-                <summary data-i18n="advanced_fields">Advanced fields</summary>
-                <div class="grid-2">
-                  <div class="field">
-                    <label class="label" data-i18n="f_top_videos">Top video URLs (one per line)</label>
-                    <textarea class="textarea mono" name="top_video_urls" rows="4" placeholder="https://..."></textarea>
-                  </div>
-                  <div class="field">
-                    <label class="label" data-i18n="f_weak_videos">Weak video URLs (one per line)</label>
-                    <textarea class="textarea mono" name="weak_video_urls" rows="4" placeholder="https://..."></textarea>
-                  </div>
-                  <div class="field">
-                    <label class="label" data-i18n="f_past_scripts">Past scripts (one per line)</label>
-                    <textarea class="textarea" name="past_scripts" rows="4" placeholder="Script 1..."></textarea>
+              <div class="box">
+                <div class="box-top">
+                  <div class="k">Trending hashtags</div>
+                  <div class="actions">
+                    <button class="btn small" type="button" id="refreshHashtags">Refresh</button>
+                    <button class="btn small" type="button" id="copyHashtags">Copy</button>
                   </div>
                 </div>
-              </details>
-
-              <div class="actions">
-                <button class="btn primary" type="submit" data-i18n="btn_send">Send</button>
-                <button class="btn" type="button" data-action="fill-example" data-example="onboard" data-i18n="btn_example">Fill example</button>
+                <div class="chips" id="hashtagsChips"></div>
+                <pre class="mono" id="hashtagsLine" style="margin-top:10px;">—</pre>
               </div>
-            </form>
-          </article>
 
-          <!-- Build Pack -->
-          <article class="panel" id="panel-build">
-            <div class="panel-head">
-              <div>
-                <h2 data-i18n="h_build">Build Pack</h2>
-                <p class="muted" data-i18n="d_build">Generate a ready-to-record kit + experiment plan + prompt pack.</p>
-              </div>
-              <div class="endpoint">POST <span class="mono">/v1/build-pack</span></div>
-            </div>
-
-            <form class="form" data-endpoint="/v1/build-pack" data-method="POST">
-              <div class="grid-2">
-                <div class="field">
-                  <label class="label" data-i18n="f_creator_id">creator_id</label>
-                  <input class="input mono" name="creator_id" placeholder="UUID" required />
+              <div class="box">
+                <div class="box-top">
+                  <div class="k">Final caption (text + hashtags)</div>
+                  <button class="btn small" type="button" id="copyFinalCaption">Copy</button>
                 </div>
-
-                <div class="field">
-                  <label class="label" data-i18n="f_mode">Mode</label>
-                  <select class="select" name="mode">
-                    <option value="manual" selected>manual</option>
-                    <option value="tiktok">tiktok</option>
-                    <option value="both">both</option>
-                  </select>
-                </div>
-
-                <div class="field">
-                  <label class="label" data-i18n="f_idea_title">Idea title</label>
-                  <input class="input" name="idea_title" placeholder="3 steps to improve..." required />
-                </div>
-
-                <div class="field">
-                  <label class="label" data-i18n="f_angle">Angle</label>
-                  <input class="input" name="angle" placeholder="Saveable checklist" required />
-                </div>
-
-                <div class="field">
-                  <label class="label" data-i18n="f_value_promise">Value promise</label>
-                  <input class="input" name="value_promise" placeholder="Simple plan: do, measure, iterate." required />
-                </div>
-
-                <div class="field">
-                  <label class="label" data-i18n="f_length">Preferred length (sec)</label>
-                  <input class="input mono" name="preferred_length_sec" type="number" min="10" max="90" value="28" />
-                </div>
+                <pre class="mono" id="finalCaption">—</pre>
               </div>
-
-              <div class="actions">
-                <button class="btn primary" type="submit" data-i18n="btn_send">Send</button>
-                <button class="btn" type="button" data-action="fill-example" data-example="build" data-i18n="btn_example">Fill example</button>
-              </div>
-            </form>
-          </article>
-
-          <!-- Daily Brief -->
-          <article class="panel" id="panel-brief">
-            <div class="panel-head">
-              <div>
-                <h2 data-i18n="h_brief">Daily Brief</h2>
-                <p class="muted" data-i18n="d_brief">Generate daily ideas (angles + hooks).</p>
-              </div>
-              <div class="endpoint">POST <span class="mono">/v1/daily-brief</span></div>
-            </div>
-
-            <form class="form" data-endpoint="/v1/daily-brief" data-method="POST">
-              <div class="grid-2">
-                <div class="field">
-                  <label class="label" data-i18n="f_creator_id">creator_id</label>
-                  <input class="input mono" name="creator_id" placeholder="UUID" required />
-                </div>
-
-                <div class="field">
-                  <label class="label" data-i18n="f_limit">Ideas limit</label>
-                  <input class="input mono" name="limit" type="number" min="1" max="20" value="5" />
-                </div>
-              </div>
-
-              <div class="actions">
-                <button class="btn primary" type="submit" data-i18n="btn_send">Send</button>
-                <button class="btn" type="button" data-action="fill-example" data-example="brief" data-i18n="btn_example">Fill example</button>
-              </div>
-            </form>
-          </article>
-
-          <!-- Submit Metrics -->
-          <article class="panel" id="panel-metrics">
-            <div class="panel-head">
-              <div>
-                <h2 data-i18n="h_metrics">Submit Metrics</h2>
-                <p class="muted" data-i18n="d_metrics">Send experiment performance metrics (views, likes, shares, etc.).</p>
-              </div>
-              <div class="endpoint">POST <span class="mono">/v1/submit-metrics</span></div>
-            </div>
-
-            <form class="form" data-endpoint="/v1/submit-metrics" data-method="POST">
-              <div class="grid-2">
-                <div class="field">
-                  <label class="label" data-i18n="f_creator_id">creator_id</label>
-                  <input class="input mono" name="creator_id" placeholder="UUID" required />
-                </div>
-
-                <div class="field">
-                  <label class="label" data-i18n="f_experiment_id">experiment_id</label>
-                  <input class="input mono" name="experiment_id" placeholder="UUID" required />
-                </div>
-              </div>
-
-              <div class="field">
-                <label class="label" data-i18n="f_metrics_json">metrics JSON</label>
-                <textarea class="textarea mono" name="metrics" rows="6" placeholder='{"hook":"C","views":1200,"likes":140,"comments":22,"shares":9,"saves":18,"watch_time_avg_sec":9.7}'></textarea>
-              </div>
-
-              <div class="actions">
-                <button class="btn primary" type="submit" data-i18n="btn_send">Send</button>
-                <button class="btn" type="button" data-action="fill-example" data-example="metrics" data-i18n="btn_example">Fill example</button>
-              </div>
-            </form>
-          </article>
-
-          <!-- Report -->
-          <article class="panel" id="panel-report">
-            <div class="panel-head">
-              <div>
-                <h2 data-i18n="h_report">Report</h2>
-                <p class="muted" data-i18n="d_report">Fetch a report for an experiment_id.</p>
-              </div>
-              <div class="endpoint">GET <span class="mono">/v1/report/&lt;experiment_id&gt;?creator_id=...</span></div>
-            </div>
-
-            <form class="form" data-endpoint="/v1/report" data-method="GET">
-              <div class="grid-2">
-                <div class="field">
-                  <label class="label" data-i18n="f_creator_id">creator_id</label>
-                  <input class="input mono" name="creator_id" placeholder="UUID" required />
-                </div>
-
-                <div class="field">
-                  <label class="label" data-i18n="f_experiment_id">experiment_id</label>
-                  <input class="input mono" name="experiment_id" placeholder="UUID" required />
-                </div>
-              </div>
-
-              <div class="actions">
-                <button class="btn primary" type="submit" data-i18n="btn_send">Send</button>
-                <button class="btn" type="button" data-action="fill-example" data-example="report" data-i18n="btn_example">Fill example</button>
-              </div>
-            </form>
-          </article>
-        </section>
-
-        <!-- Right: Output -->
-        <section class="output">
-          <div class="output-head">
-            <div>
-              <div class="output-title" data-i18n="out_title">Response</div>
-              <div class="output-sub muted" id="lastRequestLine" data-i18n="out_sub">No requests yet.</div>
-            </div>
-
-            <div class="output-actions">
-              <button class="btn" id="btnCopyAll" type="button">Copy All (Text)</button>
-              <button class="btn" id="btnCopyRaw" type="button">Copy Raw JSON</button>
-              <button class="btn" id="btnClear" type="button" data-i18n="btn_clear">Clear</button>
             </div>
           </div>
 
-          <div class="card" style="margin:16px 16px 0 16px;">
-            <div class="card-row">
-              <div class="k" data-i18n="curl_hint">Quick curl</div>
-              <pre class="mono small" id="curlPreview"></pre>
+          <!-- 3) Next actions -->
+          <div class="card" id="cardNext">
+            <div class="card-h">
+              <div>
+                <div class="t">3) Next step (execution)</div>
+                <div class="m">What to do after publishing + what to measure.</div>
+              </div>
+              <button class="btn small" type="button" id="copyNext">Copy</button>
+            </div>
+            <div class="card-b">
+              <div class="box">
+                <div class="box-top">
+                  <div class="k">Checklist</div>
+                  <button class="btn small" type="button" id="copyChecklist">Copy</button>
+                </div>
+                <pre class="mono" id="nextChecklist">—</pre>
+              </div>
             </div>
           </div>
 
-          <!-- Cards output -->
-          <div class="cards" id="cardsOut"></div>
-
-          <!-- Raw JSON (collapsible) -->
-          <details class="details-raw" id="rawBox">
-            <summary>Raw JSON</summary>
-            <div class="inner">
-              <pre class="json mono" id="jsonOut">{}</pre>
-            </div>
+          <!-- Raw JSON -->
+          <details class="details">
+            <summary>Raw JSON (debug)</summary>
+            <pre class="mono" id="rawJson" style="margin-top:10px;">{}</pre>
           </details>
-
-          <div class="footnote muted" data-i18n="footnote">
-            If Arabic looks garbled in your terminal, ensure UTF-8 output encoding.
-          </div>
-        </section>
+        </div>
       </div>
-    </main>
+    </section>
   </div>
 
   <script>
-    // ------------------------------
-    // i18n dictionary (UI strings)
-    // ------------------------------
-    const I18N = {
-      en: {
-        brand_sub: "API Console",
-        sidebar_hint: "Tip: Use the forms to call the API. Results appear on the right.",
-        title_console: "Console",
-        status_ok: "Service online",
-        label_language: "Language",
-        label_bilingual: "Show English helper",
+    const $ = (s) => document.querySelector(s);
+    const esc = (s) => String(s ?? "");
+    const pretty = (o) => { try { return JSON.stringify(o, null, 2); } catch(e){ return String(o); } };
+    const parseJson = (t) => { try { return JSON.parse(t); } catch(e){ return null; } };
 
-        nav_onboard: "Onboard",
-        nav_build: "Build Pack",
-        nav_brief: "Daily Brief",
-        nav_metrics: "Submit Metrics",
-        nav_report: "Report",
-        nav_health: "Health",
-
-        h_onboard: "Onboard",
-        d_onboard: "Create a creator profile and get a creator_id.",
-        h_build: "Build Pack",
-        d_build: "Generate a ready-to-record kit + experiment plan + prompt pack.",
-        h_brief: "Daily Brief",
-        d_brief: "Generate daily ideas (angles + hooks).",
-        h_metrics: "Submit Metrics",
-        d_metrics: "Send experiment performance metrics (views, likes, shares, etc.).",
-        h_report: "Report",
-        d_report: "Fetch a report for an experiment_id.",
-
-        advanced_fields: "Advanced fields",
-
-        f_display_name: "Display name",
-        f_goal: "Goal",
-        f_primary_niche: "Primary niche",
-        f_sub_niches: "Sub-niches (comma separated)",
-        f_language: "Content language",
-        f_tone: "Tone",
-        f_tiktok_url: "TikTok profile URL (optional)",
-        f_constraints: "Constraints JSON (optional)",
-        f_top_videos: "Top video URLs (one per line)",
-        f_weak_videos: "Weak video URLs (one per line)",
-        f_past_scripts: "Past scripts (one per line)",
-        f_creator_id: "creator_id",
-        f_mode: "Mode",
-        f_idea_title: "Idea title",
-        f_angle: "Angle",
-        f_value_promise: "Value promise",
-        f_length: "Preferred length (sec)",
-        f_limit: "Ideas limit",
-        f_experiment_id: "experiment_id",
-        f_metrics_json: "metrics JSON",
-
-        btn_send: "Send",
-        btn_example: "Fill example",
-        btn_clear: "Clear",
-
-        out_title: "Response",
-        out_sub: "No requests yet.",
-        curl_hint: "Quick curl",
-        footnote: "If Arabic looks garbled in your terminal, ensure UTF-8 output encoding."
-      },
-
-      ar: {
-        brand_sub: "لوحة استدعاء API",
-        sidebar_hint: "تلميح: استخدم النماذج لاستدعاء الـ API، وستظهر النتائج على اليمين.",
-        title_console: "لوحة التحكم",
-        status_ok: "الخدمة تعمل",
-        label_language: "اللغة",
-        label_bilingual: "إظهار الإنجليزية كمساعدة",
-
-        nav_onboard: "إنشاء ملف",
-        nav_build: "حزمة إنتاج",
-        nav_brief: "ملخص يومي",
-        nav_metrics: "رفع قياسات",
-        nav_report: "تقرير",
-        nav_health: "الصحة",
-
-        h_onboard: "إنشاء ملف",
-        d_onboard: "إنشاء ملف صانع محتوى والحصول على creator_id.",
-        h_build: "حزمة إنتاج",
-        d_build: "توليد Ready-to-record kit + خطة تجربة + Prompt pack.",
-        h_brief: "ملخص يومي",
-        d_brief: "توليد أفكار يومية (زوايا + Hooks).",
-        h_metrics: "رفع قياسات",
-        d_metrics: "إرسال قياسات الأداء (مشاهدات، إعجابات، مشاركات...).",
-        h_report: "تقرير",
-        d_report: "جلب تقرير تجربة عبر experiment_id.",
-
-        advanced_fields: "حقول متقدمة",
-
-        f_display_name: "الاسم الظاهر",
-        f_goal: "الهدف",
-        f_primary_niche: "النيتش الأساسي",
-        f_sub_niches: "نيتشات فرعية (بفاصلة)",
-        f_language: "لغة المحتوى",
-        f_tone: "النبرة",
-        f_tiktok_url: "رابط تيكتوك (اختياري)",
-        f_constraints: "قيود JSON (اختياري)",
-        f_top_videos: "روابط أفضل فيديوهات (سطر لكل رابط)",
-        f_weak_videos: "روابط فيديوهات ضعيفة (سطر لكل رابط)",
-        f_past_scripts: "سكربتات سابقة (سطر لكل سكربت)",
-        f_creator_id: "creator_id",
-        f_mode: "الوضع",
-        f_idea_title: "عنوان الفكرة",
-        f_angle: "الزاوية",
-        f_value_promise: "وعد القيمة",
-        f_length: "المدة (ثانية)",
-        f_limit: "عدد الأفكار",
-        f_experiment_id: "experiment_id",
-        f_metrics_json: "metrics JSON",
-
-        btn_send: "إرسال",
-        btn_example: "تعبئة مثال",
-        btn_clear: "مسح",
-
-        out_title: "النتيجة",
-        out_sub: "لا توجد طلبات بعد.",
-        curl_hint: "curl سريع",
-        footnote: "إذا ظهر العربي بشكل غير صحيح في الطرفية، فعّل إخراج UTF-8."
-      }
+    const state = {
+      last: null,
+      kit: null,
+      plan: null,
+      promptPack: null,
+      uiLang: "en",
+      trendingHashtags: []
     };
 
-    const state = { lang: "en", bilingual: true };
-    const $ = (sel) => document.querySelector(sel);
-    const $$ = (sel) => Array.from(document.querySelectorAll(sel));
-
-    function t(key) {
-      const lang = state.lang;
-      const base = I18N.en[key] ?? key;
-      const v = (I18N[lang] && I18N[lang][key]) ? I18N[lang][key] : base;
-      if (state.bilingual && lang !== "en") return `${v} — ${base}`;
-      return v;
+    function setDirByLang(lang){
+      const rtl = (lang === "ar");
+      document.documentElement.lang = lang;
+      document.documentElement.dir = rtl ? "rtl" : "ltr";
     }
 
-    function applyDir() {
-      const html = document.documentElement;
-      const isRTL = (state.lang === "ar");
-      html.setAttribute("dir", isRTL ? "rtl" : "ltr");
-      html.setAttribute("lang", state.lang);
-      document.body.classList.toggle("rtl", isRTL);
+    async function copy(text){
+      try { await navigator.clipboard.writeText(String(text ?? "")); } catch(e) {}
     }
 
-    function applyI18n() {
-      $$("[data-i18n]").forEach(el => {
-        const key = el.getAttribute("data-i18n");
-        el.textContent = t(key);
-      });
-      if ($("#lastRequestLine").dataset.custom === "1") return;
-      $("#lastRequestLine").textContent = t("out_sub");
+    function artifactsByType(resp){
+      const arts = Array.isArray(resp?.artifacts) ? resp.artifacts : [];
+      const by = {};
+      for (const a of arts){
+        if (a?.type) by[a.type] = a.payload;
+      }
+      return by;
     }
 
-    function setActivePanel(id) {
-      $$(".nav-item").forEach(b => b.classList.toggle("active", b.dataset.target === id));
-      $$(".panel").forEach(p => p.classList.toggle("active", p.id === id));
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }
+    // --- VEO3 prompt builder (8s blocks) ---
+    function buildVeoBlocks(kit){
+      // We intentionally avoid on-screen text and build cinematic prompts.
+      const baseStyle =
+`STYLE:
+- vertical 9:16, cinematic lighting, clean modern look
+- sharp focus, shallow depth of field, subtle handheld movement
+- high pacing, quick cuts every ~1.5–2s, but not chaotic
+AUDIO:
+- voiceover in the same language as the script
+- subtle whoosh transitions, soft clicks for emphasis, light ambient bed
+RULES:
+- do NOT add any on-screen text or subtitles
+- keep visuals relevant to marketing + analytics + planning`;
 
-    function prettyJson(x) {
-      try { return JSON.stringify(x, null, 2); } catch(e) { return String(x); }
-    }
+      const script = (kit?.script_teleprompter || "").trim();
+      const shots = Array.isArray(kit?.shot_list) ? kit.shot_list : [];
+      const cues  = Array.isArray(kit?.edit_cues) ? kit.edit_cues : [];
 
-    function safeParseJson(text) {
-      try { return JSON.parse(text); } catch(e) { return null; }
-    }
+      // Split into ~4 segments: 0-8, 8-16, 16-24, 24-28
+      // We’ll derive VO chunks from the kit.timeline if available; else split script by lines.
+      const segs = [
+        { label: "0–8s",  start:0,  end:8,  vo:"" },
+        { label: "8–16s", start:8,  end:16, vo:"" },
+        { label: "16–24s",start:16, end:24, vo:"" },
+        { label: "24–28s",start:24, end:28, vo:"" }
+      ];
 
-    function linesToArray(text) {
-      const s = (text || "").trim();
-      if (!s) return [];
-      return s.split(/\r?\n/).map(x => x.trim()).filter(Boolean);
-    }
-
-    function commaToArray(text) {
-      const s = (text || "").trim();
-      if (!s) return [];
-      return s.split(",").map(x => x.trim()).filter(Boolean);
-    }
-
-    function buildCurl(method, endpoint, bodyObj) {
-      const url = `${location.origin}${endpoint}`;
-      if (method.toUpperCase() === "GET") return `curl -s "${url}"`;
-      const body = JSON.stringify(bodyObj, null, 2);
-      return `curl -X ${method.toUpperCase()} "${url}" \\\n  -H "Content-Type: application/json" \\\n  -d '${body.replace(/'/g, "\\'")}'`;
-    }
-
-    // ------------------------------
-    // Copy helpers
-    // ------------------------------
-    async function copyToClipboard(text, btnEl) {
-      const s = String(text ?? "");
-      try {
-        await navigator.clipboard.writeText(s);
-        if (btnEl) {
-          const old = btnEl.textContent;
-          btnEl.textContent = (state.lang === "ar") ? "تم النسخ" : "Copied";
-          setTimeout(() => btnEl.textContent = old, 900);
+      if (kit?.timeline?.sections?.length){
+        // Collect section texts into the segments based on time range overlap
+        for (const sec of kit.timeline.sections){
+          const text = (sec?.text || "").trim();
+          if (!text) continue;
+          for (const s of segs){
+            const overlaps = !(sec.t_end <= s.start || sec.t_start >= s.end);
+            if (overlaps) s.vo += (s.vo ? "\n" : "") + text;
+          }
         }
-      } catch (_) {}
-    }
-
-    // ------------------------------
-    // Card renderer
-    // ------------------------------
-    function esc(s){ return String(s ?? "").replace(/[&<>"']/g, (m)=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[m])); }
-
-    function makeCard({ title, subtitle, blocks }) {
-      // blocks: [{label, text, copyText}]
-      const card = document.createElement("div");
-      card.className = "card-pro";
-
-      const head = document.createElement("div");
-      head.className = "card-pro-h";
-
-      const left = document.createElement("div");
-      const h = document.createElement("div");
-      h.className = "card-pro-title";
-      h.textContent = title || "—";
-      left.appendChild(h);
-
-      if (subtitle) {
-        const sub = document.createElement("div");
-        sub.className = "card-pro-sub";
-        sub.textContent = subtitle;
-        left.appendChild(sub);
+      } else {
+        const lines = script.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+        // Simple distribution
+        if (lines[0]) segs[0].vo = lines[0];
+        if (lines[1]) segs[1].vo = lines[1];
+        if (lines[2]) segs[2].vo = lines[2];
+        segs[3].vo = lines.slice(3).join("\n");
       }
 
-      const right = document.createElement("div");
-      right.className = "card-pro-actions";
+      // Visual plan template
+      const visualTemplates = [
+`VISUALS:
+- fast opener: close-up talking head, confident delivery
+- cutaways: phone screen scrolling (generic UI), analytics graphs (generic), sticky notes checklist
+- quick punch-in zooms on key beats, tasteful`,
+`VISUALS:
+- b-roll sequence: hands typing campaign plan, calendar blocks, simple chart rising
+- quick cut to whiteboard with shapes (no readable text), pointer gestures
+- rhythmic cuts synced with VO`,
+`VISUALS:
+- solution montage: 3-step flow shown via objects (goal → action → measure)
+- shots: goal-setting notebook, executing task (mouse click), measurement dashboard (generic)
+- emphasize clarity and momentum`,
+`VISUALS:
+- CTA outro: talking head + upbeat close, slight camera push-in
+- end on confident look, clean background, soft vignette`
+      ];
 
-      // card-level copy = concatenation of all blocks
-      const allText = (blocks || []).map(b => `# ${b.label}\n${b.copyText || b.text || ""}`.trim()).filter(Boolean).join("\n\n");
-      const btnAll = document.createElement("button");
-      btnAll.className = "btn tiny";
-      btnAll.type = "button";
-      btnAll.textContent = "Copy card";
-      btnAll.addEventListener("click", () => copyToClipboard(allText, btnAll));
-      right.appendChild(btnAll);
+      const blocks = segs.map((s, i) => {
+        const vo = (s.vo || "").trim() || "(voiceover continues)";
+        const prompt =
+`${baseStyle}
 
-      head.appendChild(left);
-      head.appendChild(right);
+SEGMENT: ${s.label}
+${visualTemplates[i]}
 
-      const body = document.createElement("div");
-      body.className = "card-pro-b";
+VOICEOVER (verbatim):
+${vo}
 
-      (blocks || []).forEach((b) => {
-        const wrap = document.createElement("div");
-        wrap.className = "probox";
-        wrap.style.marginBottom = "12px";
+SFX:
+- subtle whoosh on each cut
+- soft click on “step” moments
+- gentle riser into the last second
+
+EDITING NOTES:
+${(cues.length ? cues.map(x=>"- "+x).join("\n") : "- quick cuts and micro-zooms")}
+CAMERA NOTES:
+${(shots.length ? shots.map(x=>"- "+x).join("\n") : "- mix talking head + b-roll")}`;
+
+        return { label: `VEO3 Prompt — ${s.label}`, text: prompt };
+      });
+
+      return blocks;
+    }
+
+    // --- Trending hashtags fetch (backend should call external analytics service) ---
+    async function fetchTrendingHashtags(creatorId, limit=12){
+      // Backend contract suggestion:
+      // GET /v1/trending-hashtags?creator_id=...&limit=12
+      // returns: { hashtags: ["#...", ...], source:"...", updated_at:"..." }
+      const url = `${location.origin}/v1/trending-hashtags?creator_id=${encodeURIComponent(creatorId)}&limit=${encodeURIComponent(limit)}`;
+      try{
+        const res = await fetch(url, { method:"GET" });
+        if (!res.ok) throw new Error("no-endpoint");
+        const j = await res.json();
+        if (Array.isArray(j?.hashtags) && j.hashtags.length) return j.hashtags;
+        throw new Error("empty");
+      }catch(_){
+        // fallback: use hashtags from kit if endpoint not ready
+        return null;
+      }
+    }
+
+    function renderHashtags(list){
+      const chips = $("#hashtagsChips");
+      chips.innerHTML = "";
+      const arr = Array.isArray(list) ? list : [];
+      for (const h of arr){
+        const el = document.createElement("span");
+        el.className = "chip";
+        el.textContent = h;
+        chips.appendChild(el);
+      }
+      const line = arr.join(" ");
+      $("#hashtagsLine").textContent = line || "—";
+      return line;
+    }
+
+    function renderVeo(kit){
+      const blocks = buildVeoBlocks(kit);
+      const wrap = $("#veoBlocks");
+      wrap.innerHTML = "";
+
+      // Copy-all text
+      const all = blocks.map(b => `### ${b.label}\n${b.text}`).join("\n\n");
+
+      $("#copyVeoAll").onclick = () => copy(all);
+
+      for (const b of blocks){
+        const box = document.createElement("div");
+        box.className = "box";
 
         const top = document.createElement("div");
-        top.style.display = "flex";
-        top.style.alignItems = "flex-start";
-        top.style.justifyContent = "space-between";
-        top.style.gap = "10px";
-        top.style.marginBottom = "10px";
+        top.className = "box-top";
 
         const k = document.createElement("div");
-        k.className = "kline";
+        k.className = "k";
         k.textContent = b.label;
 
         const btn = document.createElement("button");
-        btn.className = "btn tiny";
+        btn.className = "btn small";
         btn.type = "button";
         btn.textContent = "Copy";
-        btn.addEventListener("click", () => copyToClipboard((b.copyText ?? b.text ?? ""), btn));
+        btn.onclick = () => copy(b.text);
 
         top.appendChild(k);
         top.appendChild(btn);
 
         const pre = document.createElement("pre");
         pre.className = "mono";
-        pre.textContent = (b.text ?? "");
+        pre.textContent = b.text;
 
-        wrap.appendChild(top);
-        wrap.appendChild(pre);
+        box.appendChild(top);
+        box.appendChild(pre);
+        wrap.appendChild(box);
+      }
 
-        body.appendChild(wrap);
+      return all;
+    }
+
+    function buildCaptionLocalized(kit){
+      // We keep it simple and human: short, value-first, CTA.
+      // Language is already the creator/profile language in backend output.
+      const title = (kit?.title || "").trim();
+      const base = (kit?.caption || "").trim();
+      // Some builds include "title" inside caption; we normalize:
+      const captionText = base || title || "—";
+      return captionText;
+    }
+
+    function buildNextChecklist(resp, plan){
+      const expId = resp?.experiment_id || "—";
+      const scores = resp?.predicted?.scores
+        ? `Predicted scores: A=${resp.predicted.scores.A} | B=${resp.predicted.scores.B} | C=${resp.predicted.scores.C}`
+        : "";
+
+      const mp = Array.isArray(plan?.measurement_points) ? plan.measurement_points : [];
+      const tests = Array.isArray(plan?.what_to_test) ? plan.what_to_test : [];
+
+      return [
+        `1) Track this experiment_id: ${expId}`,
+        scores ? `2) ${scores}` : `2) Compare hooks A/B/C in the first 1–2 seconds`,
+        `3) Measure at: ${mp.length ? mp.join(", ") : "T+60m, T+24h, T+48h"}`,
+        `4) What to test next:`,
+        ...(tests.length ? tests.map(x=>`   - ${x}`) : [`   - Hook A/B/C`, `   - Caption + hashtags`, `   - Audio choice`]),
+        `5) If one variant wins: publish Part 2 within 24–48h using the same angle + one new insight.`,
+        `6) Then submit metrics via POST /v1/submit-metrics (views, likes, comments, shares, saves, avg watch time).`
+      ].filter(Boolean).join("\n");
+    }
+
+    async function renderAll(resp, creatorId){
+      const by = artifactsByType(resp);
+      const kit = by.ready_to_record_kit || null;
+      const plan = by.experiment_plan || null;
+      const pack = by.prompt_pack || null;
+
+      state.last = resp;
+      state.kit = kit;
+      state.plan = plan;
+      state.promptPack = pack;
+
+      $("#rawJson").textContent = pretty(resp);
+
+      // 1) VEO3 blocks
+      const veoAll = kit ? renderVeo(kit) : "";
+
+      // 2) Caption + hashtags (trending at publish time)
+      const captionText = kit ? buildCaptionLocalized(kit) : "—";
+      $("#captionText").textContent = captionText;
+
+      // Try trending endpoint; fallback to kit.hashtags
+      let hashtags = await fetchTrendingHashtags(creatorId, 12);
+      if (!hashtags) hashtags = Array.isArray(kit?.hashtags) ? kit.hashtags : [];
+      state.trendingHashtags = hashtags;
+
+      const hashtagsLine = renderHashtags(hashtags);
+
+      const finalCaption = [captionText, hashtagsLine].filter(x=>String(x||"").trim()).join("\n");
+      $("#finalCaption").textContent = finalCaption || "—";
+
+      // Copy hooks
+      $("#copyCaption").onclick = () => copy(finalCaption);
+      $("#copyCaptionText").onclick = () => copy(captionText);
+      $("#copyHashtags").onclick = () => copy(hashtagsLine);
+      $("#copyFinalCaption").onclick = () => copy(finalCaption);
+
+      $("#refreshHashtags").onclick = async () => {
+        let hs = await fetchTrendingHashtags(creatorId, 12);
+        if (!hs) hs = Array.isArray(kit?.hashtags) ? kit.hashtags : [];
+        state.trendingHashtags = hs;
+        const line = renderHashtags(hs);
+        const fc = [captionText, line].filter(x=>String(x||"").trim()).join("\n");
+        $("#finalCaption").textContent = fc || "—";
+      };
+
+      // 3) Next actions
+      const checklist = buildNextChecklist(resp, plan);
+      $("#nextChecklist").textContent = checklist;
+      $("#copyNext").onclick = () => copy(checklist);
+      $("#copyChecklist").onclick = () => copy(checklist);
+
+      // Global copy buttons
+      $("#copyAllText").onclick = () => {
+        const all = [
+          `=== VEO3 (8s blocks) ===\n${veoAll}`,
+          `\n=== TikTok Caption ===\n${finalCaption}`,
+          `\n=== Next Steps ===\n${checklist}`
+        ].join("\n\n");
+        copy(all);
+      };
+
+      $("#copyRaw").onclick = () => copy(pretty(resp));
+
+      // Update header line
+      $("#reqLine").textContent = `Generated. experiment_id: ${resp?.experiment_id || "—"}`;
+    }
+
+    async function callBuildPack(payload){
+      const url = `${location.origin}/v1/build-pack`;
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json; charset=utf-8" },
+        body: JSON.stringify(payload)
       });
-
-      card.appendChild(head);
-      card.appendChild(body);
-      return card;
-    }
-
-    function joinList(arr, bullet="- ") {
-      const a = Array.isArray(arr) ? arr : [];
-      return a.map(x => `${bullet}${x}`).join("\n");
-    }
-
-    function formatTimeline(tl) {
-      if (!tl || !Array.isArray(tl.sections)) return "";
-      const lines = [];
-      lines.push(`video_seconds: ${tl.video_seconds ?? ""}`.trim());
-      lines.push("");
-      tl.sections.forEach((s, i) => {
-        lines.push(`[${i+1}] ${s.type || "section"} (${s.t_start}s → ${s.t_end}s)`);
-        if (s.onscreen) lines.push(`onscreen: ${s.onscreen}`);
-        if (s.text) lines.push(`text: ${s.text}`);
-        lines.push("");
-      });
-      return lines.join("\n").trim();
-    }
-
-    function extractArtifacts(resp) {
-      // Normal shape:
-      // { artifacts:[{type, payload}], experiment_id, predicted }
-      const artifacts = Array.isArray(resp?.artifacts) ? resp.artifacts : [];
-      const byType = {};
-      artifacts.forEach(a => { if (a?.type) byType[a.type] = a.payload; });
-      return { byType, artifacts };
-    }
-
-    function buildCopyAllText(resp) {
-      const { byType } = extractArtifacts(resp);
-      const out = [];
-
-      if (resp?.experiment_id) out.push(`experiment_id: ${resp.experiment_id}`);
-
-      if (resp?.predicted?.scores) {
-        const s = resp.predicted.scores;
-        out.push(`predicted_scores: A=${s.A ?? ""}, B=${s.B ?? ""}, C=${s.C ?? ""}`);
-      }
-
-      const kit = byType.ready_to_record_kit;
-      if (kit) {
-        out.push("");
-        out.push("== READY TO RECORD KIT ==");
-
-        if (kit.title) out.push(`title: ${kit.title}`);
-        if (kit.caption) out.push(`caption:\n${kit.caption}`);
-        if (Array.isArray(kit.hashtags)) out.push(`hashtags:\n${kit.hashtags.join(" ")}`);
-        if (kit.hooks) {
-          out.push("hooks:");
-          ["A","B","C"].forEach(k => {
-            if (!kit.hooks[k]) return;
-            out.push(`- ${k}: ${kit.hooks[k].hook_text || ""}`);
-          });
-        }
-        if (kit.script_teleprompter) out.push(`script_teleprompter:\n${kit.script_teleprompter}`);
-        if (kit.edit_cues) out.push(`edit_cues:\n${joinList(kit.edit_cues)}`);
-        if (kit.shot_list) out.push(`shot_list:\n${joinList(kit.shot_list)}`);
-        if (kit.timeline) out.push(`timeline:\n${formatTimeline(kit.timeline)}`);
-      }
-
-      const plan = byType.experiment_plan;
-      if (plan) {
-        out.push("");
-        out.push("== EXPERIMENT PLAN ==");
-        if (plan.measurement_points) out.push(`measurement_points:\n${joinList(plan.measurement_points)}`);
-        if (plan.what_to_test) out.push(`what_to_test:\n${joinList(plan.what_to_test)}`);
-        if (plan.next_best_action) out.push(`next_best_action:\n${plan.next_best_action}`);
-        if (plan.win_function) out.push(`win_function:\n${prettyJson(plan.win_function)}`);
-      }
-
-      const pack = byType.prompt_pack;
-      if (pack?.prompts) {
-        out.push("");
-        out.push("== PROMPT PACK ==");
-        Object.entries(pack.prompts).forEach(([k,v]) => {
-          out.push(`${k}:\n${v}`);
-          out.push("");
-        });
-      }
-
-      return out.join("\n").trim();
-    }
-
-    function renderResponseCards(resp) {
-      const cardsOut = $("#cardsOut");
-      cardsOut.innerHTML = "";
-
-      // Raw JSON
-      $("#jsonOut").textContent = prettyJson(resp);
-
-      const { byType } = extractArtifacts(resp);
-      const kit = byType.ready_to_record_kit;
-      const plan = byType.experiment_plan;
-      const pack = byType.prompt_pack;
-
-      // Summary card
-      const sumLines = [];
-      if (resp?.experiment_id) sumLines.push(`experiment_id: ${resp.experiment_id}`);
-      if (kit?.id) sumLines.push(`artifact_id: ${kit.id}`);
-      if (kit?.title) sumLines.push(`title: ${kit.title}`);
-      if (resp?.predicted?.note) sumLines.push(`note: ${resp.predicted.note}`);
-      if (resp?.predicted?.scores) {
-        const s = resp.predicted.scores;
-        sumLines.push(`scores: A=${s.A ?? ""} | B=${s.B ?? ""} | C=${s.C ?? ""}`);
-      }
-      if (kit?.keywords) sumLines.push(`keywords: ${(kit.keywords || []).join(", ")}`);
-
-      cardsOut.appendChild(makeCard({
-        title: "Summary",
-        subtitle: "High-level identifiers and predicted score",
-        blocks: [
-          { label: "Overview", text: sumLines.join("\n"), copyText: sumLines.join("\n") }
-        ]
-      }));
-
-      // Ready-to-record kit
-      if (kit) {
-        const hashtagsText = Array.isArray(kit.hashtags) ? kit.hashtags.join(" ") : "";
-        const hooksText = kit.hooks
-          ? ["A","B","C"].map(k => kit.hooks[k] ? `${k}) ${kit.hooks[k].hook_text}\n   onscreen: ${kit.hooks[k].onscreen_text}` : "").filter(Boolean).join("\n\n")
-          : "";
-
-        const timelineText = formatTimeline(kit.timeline);
-
-        cardsOut.appendChild(makeCard({
-          title: "Ready-to-Record Kit",
-          subtitle: kit.title || "",
-          blocks: [
-            { label: "Caption", text: kit.caption || "", copyText: kit.caption || "" },
-            { label: "Hashtags", text: hashtagsText, copyText: hashtagsText },
-            { label: "Hooks (A/B/C)", text: hooksText, copyText: hooksText },
-            { label: "Script (Teleprompter)", text: kit.script_teleprompter || "", copyText: kit.script_teleprompter || "" },
-            { label: "Edit Cues", text: joinList(kit.edit_cues), copyText: joinList(kit.edit_cues) },
-            { label: "Shot List", text: joinList(kit.shot_list), copyText: joinList(kit.shot_list) },
-            { label: "Timeline", text: timelineText, copyText: timelineText }
-          ].filter(b => (b.text || "").trim().length > 0)
-        }));
-      }
-
-      // Experiment plan
-      if (plan) {
-        const winFn = plan.win_function ? prettyJson(plan.win_function) : "";
-        cardsOut.appendChild(makeCard({
-          title: "Experiment Plan",
-          subtitle: "What to test + measurement plan",
-          blocks: [
-            { label: "Measurement points", text: joinList(plan.measurement_points), copyText: joinList(plan.measurement_points) },
-            { label: "What to test", text: joinList(plan.what_to_test), copyText: joinList(plan.what_to_test) },
-            { label: "Next best action", text: plan.next_best_action || "", copyText: plan.next_best_action || "" },
-            { label: "Win function", text: winFn, copyText: winFn }
-          ].filter(b => (b.text || "").trim().length > 0)
-        }));
-      }
-
-      // Prompt pack
-      if (pack?.prompts) {
-        const blocks = Object.entries(pack.prompts).map(([k,v]) => {
-          const label = k.replace(/_/g, " ").toUpperCase();
-          return { label, text: v, copyText: v };
-        }).filter(b => (b.text || "").trim().length > 0);
-
-        cardsOut.appendChild(makeCard({
-          title: "Prompt Pack",
-          subtitle: pack.title || "",
-          blocks
-        }));
-      }
-
-      // If nothing recognized, show fallback
-      if (!kit && !plan && !pack) {
-        cardsOut.appendChild(makeCard({
-          title: "Response",
-          subtitle: "Unrecognized payload shape — raw JSON is available below",
-          blocks: [{ label: "Raw", text: prettyJson(resp), copyText: prettyJson(resp) }]
-        }));
-      }
-    }
-
-    // ------------------------------
-    // API caller
-    // ------------------------------
-    async function callApi(method, endpoint, payload, query) {
-      const upper = method.toUpperCase();
-      let url = `${location.origin}${endpoint}`;
-
-      if (upper === "GET") {
-        const experimentId = (query?.experiment_id || "").trim();
-        const creatorId = (query?.creator_id || "").trim();
-        url = `${location.origin}${endpoint}/${encodeURIComponent(experimentId)}?creator_id=${encodeURIComponent(creatorId)}`;
-      }
-
-      const opts = { method: upper, headers: { "Content-Type": "application/json; charset=utf-8" } };
-      if (upper !== "GET") opts.body = JSON.stringify(payload);
-
-      const res = await fetch(url, opts);
       const text = await res.text();
-      const parsed = safeParseJson(text);
-
-      if (!res.ok) {
-        const errPayload = parsed ? prettyJson(parsed) : text;
-        throw new Error(`HTTP ${res.status}\n${errPayload}`);
+      const j = parseJson(text);
+      if (!res.ok){
+        throw new Error(j ? pretty(j) : text);
       }
-      return parsed ?? text;
+      return j;
     }
 
-    function setOutput(requestLine, curlText, respObjOrText) {
-      const lineEl = $("#lastRequestLine");
-      lineEl.textContent = requestLine;
-      lineEl.dataset.custom = "1";
-      $("#curlPreview").textContent = curlText;
-
-      // Render cards if JSON; otherwise show as raw
-      const resp = (typeof respObjOrText === "object") ? respObjOrText : { raw: String(respObjOrText ?? "") };
-      renderResponseCards(resp);
+    function fillExample(){
+      $("#creatorId").value = "147bdaf1-8e14-4619-a7d6-9d08edd785e3";
+      $("#ideaTitle").value = "3 خطوات سريعة لتحسين نتائجك في التسويق الرقمي";
+      $("#valuePromise").value = "خطة بسيطة: نفّذ، قِس، عدّل.";
+      $("#angle").value = "قائمة خطوات قابلة للحفظ";
+      $("#lengthSec").value = 28;
     }
 
-    function setError(requestLine, curlText, errorText) {
-      setOutput(requestLine, curlText, { error: String(errorText ?? "Unknown error") });
-      $("#rawBox").open = true;
-    }
+    $("#btnExample").onclick = fillExample;
 
-    function formToPayload(form, kind) {
-      const fd = new FormData(form);
-      const obj = {};
-      fd.forEach((v, k) => obj[k] = (typeof v === "string" ? v.trim() : v));
+    $("#btnGenerate").onclick = async () => {
+      const creator_id = $("#creatorId").value.trim();
+      const idea_title = $("#ideaTitle").value.trim();
+      const value_promise = $("#valuePromise").value.trim();
 
-      if (kind === "onboard") {
-        obj.sub_niches = commaToArray(obj.sub_niches);
-        obj.constraints = obj.constraints ? (safeParseJson(obj.constraints) || {}) : {};
-        obj.tiktok_profile_url = obj.tiktok_profile_url || null;
-        obj.top_video_urls = linesToArray(obj.top_video_urls);
-        obj.weak_video_urls = linesToArray(obj.weak_video_urls);
-        obj.past_scripts = linesToArray(obj.past_scripts);
+      // Smart defaults (reduce user confusion)
+      const angle = ($("#angle").value.trim() || "Saveable checklist");
+      const preferred_length_sec = Number($("#lengthSec").value || 28);
+      const mode = "both";
+
+      if (!creator_id || !idea_title || !value_promise){
+        $("#reqLine").textContent = "Please fill: creator_id + idea title + value promise.";
+        return;
       }
 
-      if (kind === "build") obj.preferred_length_sec = Number(obj.preferred_length_sec || 28);
-      if (kind === "brief") obj.limit = Number(obj.limit || 5);
-      if (kind === "metrics") obj.metrics = obj.metrics ? (safeParseJson(obj.metrics) || {}) : {};
-      return obj;
-    }
+      $("#reqLine").textContent = "Generating…";
 
-    const examples = {
-      onboard: {
-        display_name: "Mohammad",
-        goal: "followers",
-        primary_niche: "Digital marketing",
-        sub_niches: "TikTok, Branding, AI",
-        language: "ar",
-        tone: "educational",
-        constraints: '{"no_face": false}',
-        tiktok_profile_url: "",
-        top_video_urls: "",
-        weak_video_urls: "",
-        past_scripts: ""
-      },
-      build: {
-        creator_id: "PASTE_CREATOR_ID_HERE",
-        idea_title: "3 خطوات سريعة لتحسين نتائجك في التسويق الرقمي",
-        angle: "قائمة خطوات قابلة للحفظ",
-        value_promise: "خطة بسيطة: نفّذ، قِس، عدّل.",
-        preferred_length_sec: "28",
-        mode: "both"
-      },
-      brief: { creator_id: "PASTE_CREATOR_ID_HERE", limit: "5" },
-      metrics: {
-        creator_id: "PASTE_CREATOR_ID_HERE",
-        experiment_id: "PASTE_EXPERIMENT_ID_HERE",
-        metrics: '{"hook":"C","views":1200,"likes":140,"comments":22,"shares":9,"saves":18,"watch_time_avg_sec":9.7}'
-      },
-      report: { creator_id: "PASTE_CREATOR_ID_HERE", experiment_id: "PASTE_EXPERIMENT_ID_HERE" }
+      try{
+        const payload = { creator_id, idea_title, angle, value_promise, preferred_length_sec, mode };
+        const resp = await callBuildPack(payload);
+        await renderAll(resp, creator_id);
+      }catch(err){
+        $("#reqLine").textContent = "Error. Open Raw JSON for details.";
+        $("#rawJson").textContent = String(err.message || err);
+      }
     };
 
-    function fillExample(panelId) {
-      const panel = document.getElementById(panelId);
-      const form = panel.querySelector("form");
-      const exKey = panelId.replace("panel-", "");
-      const map = (exKey === "onboard") ? examples.onboard
-                : (exKey === "build") ? examples.build
-                : (exKey === "brief") ? examples.brief
-                : (exKey === "metrics") ? examples.metrics
-                : examples.report;
+    $("#clearOut").onclick = () => {
+      state.last = null; state.kit = null; state.plan = null; state.promptPack = null; state.trendingHashtags = [];
+      $("#reqLine").textContent = "No requests yet.";
+      $("#rawJson").textContent = "{}";
+      $("#veoBlocks").innerHTML = "";
+      $("#captionText").textContent = "—";
+      $("#hashtagsChips").innerHTML = "";
+      $("#hashtagsLine").textContent = "—";
+      $("#finalCaption").textContent = "—";
+      $("#nextChecklist").textContent = "—";
+    };
 
-      Object.entries(map).forEach(([k, v]) => {
-        const el = form.querySelector(`[name="${k}"]`);
-        if (!el) return;
-        el.value = v;
-      });
-    }
-
-    // Nav actions
-    $$(".nav-item").forEach(btn => btn.addEventListener("click", () => setActivePanel(btn.dataset.target)));
-
-    // Form submission
-    $$(".form").forEach(form => {
-      form.addEventListener("submit", async (e) => {
-        e.preventDefault();
-        const endpoint = form.dataset.endpoint;
-        const method = form.dataset.method || "POST";
-        const panel = form.closest(".panel");
-        const kind = panel.id.replace("panel-", "");
-
-        try {
-          if (kind === "report") {
-            const query = {
-              creator_id: form.querySelector('[name="creator_id"]').value,
-              experiment_id: form.querySelector('[name="experiment_id"]').value
-            };
-            const urlShown = `${method} /v1/report/${query.experiment_id}?creator_id=...`;
-            const curlText = `curl -s "${location.origin}/v1/report/${query.experiment_id}?creator_id=${query.creator_id}"`;
-            const res = await callApi(method, endpoint, null, query);
-            setOutput(urlShown, curlText, res);
-            return;
-          }
-
-          const payload = formToPayload(form, kind);
-          const curlText = buildCurl(method, endpoint, payload);
-          const res = await callApi(method, endpoint, payload);
-          setOutput(`${method} ${endpoint}`, curlText, res);
-        } catch (err) {
-          setError(`${method} ${endpoint}`, "", String(err.message || err));
-        }
-      });
-
-      form.querySelectorAll('[data-action="fill-example"]').forEach(btn => {
-        btn.addEventListener("click", () => {
-          const panel = form.closest(".panel");
-          fillExample(panel.id);
-        });
-      });
-    });
-
-    // Output controls
-    $("#btnClear").addEventListener("click", () => {
-      $("#cardsOut").innerHTML = "";
-      $("#jsonOut").textContent = "{}";
-      $("#curlPreview").textContent = "";
-      $("#lastRequestLine").textContent = t("out_sub");
-      $("#lastRequestLine").dataset.custom = "0";
-      $("#rawBox").open = false;
-    });
-
-    $("#btnCopyRaw").addEventListener("click", (e) => {
-      copyToClipboard($("#jsonOut").textContent || "{}", e.target);
-    });
-
-    $("#btnCopyAll").addEventListener("click", (e) => {
-      const raw = safeParseJson($("#jsonOut").textContent || "{}") || {};
-      const all = buildCopyAllText(raw);
-      copyToClipboard(all || ($("#jsonOut").textContent || "{}"), e.target);
-    });
-
-    // Language controls
-    $("#langSelect").addEventListener("change", (e) => {
-      state.lang = e.target.value;
-      applyDir();
-      applyI18n();
-    });
-
-    $("#bilingualToggle").addEventListener("change", (e) => {
-      state.bilingual = !!e.target.checked;
-      applyI18n();
-    });
+    $("#uiLang").onchange = (e) => {
+      state.uiLang = e.target.value;
+      setDirByLang(state.uiLang);
+    };
 
     // init
     $("#baseUrlPill").textContent = location.origin;
-    applyDir();
-    applyI18n();
-    setOutput("—", "", {});
+    setDirByLang($("#uiLang").value);
   </script>
 </body>
 </html>
