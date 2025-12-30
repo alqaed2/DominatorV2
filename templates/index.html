@@ -5,68 +5,13 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>AI DOMINATOR — Publisher</title>
   <link rel="stylesheet" href="/static/style.css" />
-
-  <style>
-    /* Layout */
-    .content { display:grid; grid-template-columns: 420px 1fr; gap:16px; padding:16px; }
-    @media (max-width: 1100px){ .content { grid-template-columns: 1fr; } }
-
-    /* Panels */
-    .panel { border:1px solid var(--border); border-radius: var(--radius); background: rgba(0,0,0,.14); overflow:hidden; }
-    .panel-h { padding:14px 14px 10px 14px; border-bottom:1px solid var(--border); display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
-    .panel-h h2 { margin:0; font-size:16px; }
-    .panel-h .sub { margin-top:6px; font-size:12px; color: var(--muted); }
-    .panel-b { padding:14px; display:flex; flex-direction:column; gap:12px; }
-
-    /* Inputs */
-    .field { display:flex; flex-direction:column; gap:6px; }
-    .label { font-size:12px; color: var(--muted); }
-    .grid2 { display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
-    @media (max-width: 520px){ .grid2 { grid-template-columns:1fr; } }
-
-    /* Output blocks */
-    .out { display:flex; flex-direction:column; gap:12px; }
-    .card { border:1px solid var(--border); border-radius: var(--radius); background: rgba(0,0,0,.12); overflow:hidden; }
-    .card-h { padding:12px 12px 10px 12px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; gap:10px; }
-    .card-h .t { font-weight:800; }
-    .card-h .m { font-size:12px; color: var(--muted); margin-top:4px; }
-    .card-b { padding:12px; display:flex; flex-direction:column; gap:10px; }
-
-    .box { border:1px solid var(--border); background: rgba(0,0,0,.16); border-radius: 12px; padding:12px; }
-    .box-top { display:flex; justify-content:space-between; gap:10px; align-items:flex-start; margin-bottom:10px; }
-    .box-top .k { font-size:12px; color: var(--muted); }
-    pre { margin:0; white-space: pre-wrap; word-break: break-word; }
-    .chips { display:flex; flex-wrap:wrap; gap:8px; }
-    .chip { font-size:12px; color: var(--muted); border:1px solid var(--border); background: rgba(15,21,34,.35); padding:6px 10px; border-radius:999px; }
-
-    /* Header */
-    .topbar { display:flex; justify-content:space-between; align-items:center; padding:14px 16px; border-bottom:1px solid var(--border); }
-    .topbar .title { font-weight:900; }
-    .pill { display:inline-flex; align-items:center; gap:8px; border:1px solid var(--border); background: rgba(0,0,0,.12); padding:6px 10px; border-radius: 999px; font-size:12px; color: var(--muted); }
-    .pill-dot { width:8px; height:8px; border-radius:999px; background:#22c55e; display:inline-block; }
-    .actions { display:flex; gap:10px; flex-wrap:wrap; }
-    .btn.small { padding:8px 10px; border-radius: 12px; font-weight:700; }
-    .muted { color: var(--muted); }
-    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
-    .hint { font-size:12px; color: var(--muted); line-height:1.5; }
-    .divider { height:1px; background: var(--border); opacity:.8; margin:6px 0; }
-  </style>
 </head>
 
 <body>
   <header class="topbar">
-    <div>
-      <div class="title">AI DOMINATOR — Publisher</div>
-      <div style="display:flex; gap:10px; margin-top:8px; flex-wrap:wrap;">
-        <span class="pill"><span class="pill-dot"></span><span id="svcLine">Service online</span></span>
-        <span class="pill mono" id="baseUrlPill"></span>
-      </div>
-    </div>
-
-    <div class="actions">
-      <label class="pill" style="gap:10px;">
-        <span class="muted">UI</span>
-        <select id="uiLang" class="select" style="min-width:160px;">
+    <div class="left">
+      <div class="lang">
+        <select id="uiLang" aria-label="UI language">
           <option value="en" selected>English</option>
           <option value="ar">العربية</option>
           <option value="es">Español</option>
@@ -74,552 +19,657 @@
           <option value="de">Deutsch</option>
           <option value="pt">Português</option>
           <option value="tr">Türkçe</option>
-          <option value="ru">Русский</option>
           <option value="id">Bahasa Indonesia</option>
+          <option value="hi">हिन्दी</option>
+          <option value="ru">Русский</option>
+          <option value="ja">日本語</option>
+          <option value="ko">한국어</option>
         </select>
-      </label>
+        <span class="pill">UI</span>
+      </div>
+    </div>
+
+    <div class="center">
+      <div class="brand">AI DOMINATOR — Publisher</div>
+    </div>
+
+    <div class="right">
+      <div class="pill mono" id="baseUrlPill"></div>
+      <div class="pill ok" id="statusPill">Service online</div>
     </div>
   </header>
 
-  <div class="content">
-    <!-- LEFT: minimal inputs -->
+  <main class="wrap">
     <section class="panel">
-      <div class="panel-h">
-        <div>
-          <h2>Generate Pack</h2>
-          <div class="sub">Minimal inputs. Everything else uses smart defaults.</div>
-        </div>
-        <div class="pill mono">POST /v1/build-pack</div>
+      <div class="panelHeader">
+        <h2 id="t_setup">Quick setup</h2>
+        <p class="muted" id="t_setup_sub">Fill the basics. Advanced inputs run automatically in the background.</p>
       </div>
 
-      <div class="panel-b">
-        <div class="hint">
-          Required: <b>creator_id</b> + <b>idea</b> + <b>value</b>. <br/>
-          Optional: angle + length. Mode defaults to <span class="mono">both</span>.
+      <div class="grid2">
+        <div class="field">
+          <label id="t_creator_id" for="creatorId">Creator ID</label>
+          <input id="creatorId" type="text" placeholder="e.g. 147bdaf1-..." />
+          <div class="hint" id="t_creator_hint">Required. Use the creator_id you got from /v1/onboard</div>
         </div>
 
         <div class="field">
-          <label class="label">creator_id</label>
-          <input id="creatorId" class="input mono" placeholder="UUID" />
+          <label id="t_lang" for="contentLang">Content language</label>
+          <select id="contentLang">
+            <option value="en" selected>English</option>
+            <option value="ar">Arabic (العربية)</option>
+            <option value="es">Spanish</option>
+            <option value="fr">French</option>
+            <option value="de">German</option>
+            <option value="pt">Portuguese</option>
+            <option value="tr">Turkish</option>
+            <option value="id">Indonesian</option>
+            <option value="hi">Hindi</option>
+            <option value="ru">Russian</option>
+            <option value="ja">Japanese</option>
+            <option value="ko">Korean</option>
+          </select>
+          <div class="hint" id="t_lang_hint">This language controls caption + hashtags + prompts output.</div>
+        </div>
+
+        <div class="field span2">
+          <label id="t_title" for="ideaTitle">Idea title</label>
+          <input id="ideaTitle" type="text" placeholder="e.g. 3 quick steps to improve results in digital marketing" />
         </div>
 
         <div class="field">
-          <label class="label">Idea title</label>
-          <input id="ideaTitle" class="input" placeholder="3 خطوات سريعة لتحسين نتائجك في التسويق الرقمي" />
+          <label id="t_topic" for="topic">Topic / niche</label>
+          <input id="topic" type="text" placeholder="e.g. digital marketing" />
+          <div class="hint" id="t_topic_hint">Used for trending-hashtags selection.</div>
         </div>
 
         <div class="field">
-          <label class="label">Value promise</label>
-          <input id="valuePromise" class="input" placeholder="خطة بسيطة: نفّذ، قِس، عدّل." />
+          <label id="t_mode" for="mode">Mode</label>
+          <select id="mode">
+            <option value="both" selected>both</option>
+            <option value="manual">manual</option>
+          </select>
+          <div class="hint" id="t_mode_hint">Keep both for best output.</div>
         </div>
+      </div>
 
-        <div class="grid2">
-          <div class="field">
-            <label class="label">Angle (optional)</label>
-            <input id="angle" class="input" placeholder="قائمة خطوات قابلة للحفظ" />
-          </div>
-          <div class="field">
-            <label class="label">Length (sec)</label>
-            <input id="lengthSec" class="input mono" type="number" min="10" max="90" value="28" />
-          </div>
+      <div class="actions">
+        <button class="btn primary" id="btnGenerate">Generate Pack</button>
+        <button class="btn" id="btnHashtags">Fetch Trending Hashtags</button>
+        <button class="btn ghost" id="btnClear">Clear</button>
+      </div>
+
+      <div class="alert" id="alertBox" hidden></div>
+
+      <details class="debug">
+        <summary id="t_debug">Debug</summary>
+        <div class="debugGrid">
+          <div class="kv"><span>Hashtags endpoint</span><code>/v1/trending-hashtags</code></div>
+          <div class="kv"><span>Build-pack endpoint</span><code>/v1/build-pack</code></div>
+          <div class="kv"><span>Last error</span><code id="lastErr">-</code></div>
         </div>
+      </details>
+    </section>
 
-        <details class="details">
-          <summary>Advanced (hidden defaults)</summary>
-          <div class="hint" style="margin-top:10px;">
-            These are auto-filled in the background:
-            <div class="divider"></div>
-            <div class="mono">
-              mode = "both"<br/>
-              hooks = A/B/C from engine<br/>
-              script/timeline generation = enabled<br/>
-              publish_text language = creator profile language
-            </div>
-          </div>
-        </details>
+    <section class="panel">
+      <div class="panelHeader">
+        <h2 id="t_outputs">Outputs</h2>
+        <p class="muted" id="t_outputs_sub">Clear cards, ready to copy/paste externally.</p>
+      </div>
 
-        <div class="actions" style="margin-top:6px;">
-          <button id="btnGenerate" class="btn primary" type="button">Generate</button>
-          <button id="btnExample" class="btn" type="button">Fill example</button>
-        </div>
-
-        <div class="divider"></div>
-
-        <div class="hint">
-          After publishing on TikTok, use <span class="mono">/v1/submit-metrics</span> to feed results back and get an optimized Part 2.
+      <div id="results" class="cards">
+        <div class="empty" id="emptyState">
+          <div class="emptyTitle" id="t_empty_title">No results yet</div>
+          <div class="emptySub" id="t_empty_sub">Generate a pack to see your VEO3 prompt, caption + hashtags, hooks, script, and more.</div>
         </div>
       </div>
     </section>
+  </main>
 
-    <!-- RIGHT: publish-ready outputs -->
-    <section class="out">
-      <div class="panel">
-        <div class="panel-h">
-          <div>
-            <h2>Publish-ready Output</h2>
-            <div class="sub" id="reqLine">No requests yet.</div>
-          </div>
-          <div class="actions">
-            <button id="copyAllText" class="btn small" type="button">Copy All</button>
-            <button id="copyRaw" class="btn small" type="button">Copy Raw JSON</button>
-            <button id="clearOut" class="btn small" type="button">Clear</button>
-          </div>
-        </div>
+  <footer class="foot">
+    <span class="muted">© AI DOMINATOR</span>
+    <span class="muted mono" id="buildInfo"></span>
+  </footer>
 
-        <div class="panel-b">
-          <!-- 1) VEO3 -->
-          <div class="card" id="cardVeo">
-            <div class="card-h">
-              <div>
-                <div class="t">1) VEO3 Video Prompt (8s blocks)</div>
-                <div class="m">Copy each block into VEO3. Audio + VO + SFX included. No on-screen text.</div>
-              </div>
-              <button class="btn small" type="button" id="copyVeoAll">Copy VEO3 All</button>
-            </div>
-            <div class="card-b" id="veoBlocks"></div>
-          </div>
+<script>
+(() => {
+  // -------------------------------
+  // i18n (UI labels) - EN + AR (others fallback to EN)
+  // -------------------------------
+  const I18N = {
+    en: {
+      setup: "Quick setup",
+      setupSub: "Fill the basics. Advanced inputs run automatically in the background.",
+      creatorId: "Creator ID",
+      creatorHint: "Required. Use the creator_id you got from /v1/onboard",
+      lang: "Content language",
+      langHint: "This language controls caption + hashtags + prompts output.",
+      title: "Idea title",
+      topic: "Topic / niche",
+      topicHint: "Used for trending-hashtags selection.",
+      mode: "Mode",
+      modeHint: "Keep both for best output.",
+      generate: "Generate Pack",
+      hashtags: "Fetch Trending Hashtags",
+      clear: "Clear",
+      outputs: "Outputs",
+      outputsSub: "Clear cards, ready to copy/paste externally.",
+      emptyTitle: "No results yet",
+      emptySub: "Generate a pack to see your VEO3 prompt, caption + hashtags, hooks, script, and more.",
+      debug: "Debug",
+      serviceOnline: "Service online",
+      copying: "Copied",
+      copy: "Copy",
+      veoprompt: "VEO3 Video Prompt (segmented)",
+      captionTags: "TikTok caption + trending hashtags",
+      hooks: "Hooks (A/B/C)",
+      teleprompter: "Teleprompter script",
+      srt: "SRT captions",
+      timeline: "Timeline",
+      rawJson: "Raw JSON (for troubleshooting)",
+      source: "source",
+      updatedAt: "updated_at",
+      errMissing: "Please fill Creator ID first.",
+      errTitle: "Please fill Idea title.",
+      errTopic: "Please fill Topic/Niche to fetch hashtags."
+    },
+    ar: {
+      setup: "إعداد سريع",
+      setupSub: "املأ الأساسيات فقط. المدخلات المتقدمة تعمل تلقائيًا في الخلفية.",
+      creatorId: "معرّف المستخدم (Creator ID)",
+      creatorHint: "إلزامي. استخدم creator_id الذي حصلت عليه من /v1/onboard",
+      lang: "لغة المحتوى",
+      langHint: "هذه اللغة تتحكم في النص + الهاشتاجات + البرومبتات.",
+      title: "عنوان الفكرة",
+      topic: "المجال / النيتش",
+      topicHint: "يُستخدم لاختيار هاشتاجات الترند.",
+      mode: "الوضع",
+      modeHint: "اتركها both لأفضل النتائج.",
+      generate: "توليد الحزمة",
+      hashtags: "جلب هاشتاجات ترند",
+      clear: "مسح",
+      outputs: "المخرجات",
+      outputsSub: "بطاقات واضحة جاهزة للنسخ واللصق.",
+      emptyTitle: "لا توجد نتائج بعد",
+      emptySub: "قم بتوليد حزمة لعرض برومبت VEO3 والنص والهاشتاجات والهوكات والسكربت وغيرها.",
+      debug: "تصحيح",
+      serviceOnline: "الخدمة تعمل",
+      copying: "تم النسخ",
+      copy: "نسخ",
+      veoprompt: "برومبت VEO3 للفيديو (مقسّم)",
+      captionTags: "نص تيكتوك + هاشتاجات ترند",
+      hooks: "الهوكات (A/B/C)",
+      teleprompter: "سكربت القراءة (Teleprompter)",
+      srt: "ترجمة SRT",
+      timeline: "التايم لاين",
+      rawJson: "JSON الخام (للتشخيص)",
+      source: "المصدر",
+      updatedAt: "آخر تحديث",
+      errMissing: "أدخل Creator ID أولًا.",
+      errTitle: "أدخل عنوان الفكرة.",
+      errTopic: "أدخل المجال/النيتش لجلب هاشتاجات الترند."
+    }
+  };
 
-          <!-- 2) TikTok caption -->
-          <div class="card" id="cardTt">
-            <div class="card-h">
-              <div>
-                <div class="t">2) TikTok Caption (localized)</div>
-                <div class="m">Caption language follows user/creator language. Trending hashtags are injected at publish-time.</div>
-              </div>
-              <button class="btn small" type="button" id="copyCaption">Copy Caption</button>
-            </div>
-            <div class="card-b">
-              <div class="box">
-                <div class="box-top">
-                  <div class="k">Caption text</div>
-                  <button class="btn small" type="button" id="copyCaptionText">Copy</button>
-                </div>
-                <pre class="mono" id="captionText">—</pre>
-              </div>
+  const $ = (id) => document.getElementById(id);
+  const uiLang = $("uiLang");
+  const contentLang = $("contentLang");
+  const baseUrlPill = $("baseUrlPill");
+  const statusPill = $("statusPill");
+  const alertBox = $("alertBox");
+  const results = $("results");
+  const emptyState = $("emptyState");
+  const lastErr = $("lastErr");
 
-              <div class="box">
-                <div class="box-top">
-                  <div class="k">Trending hashtags</div>
-                  <div class="actions">
-                    <button class="btn small" type="button" id="refreshHashtags">Refresh</button>
-                    <button class="btn small" type="button" id="copyHashtags">Copy</button>
-                  </div>
-                </div>
-                <div class="chips" id="hashtagsChips"></div>
-                <pre class="mono" id="hashtagsLine" style="margin-top:10px;">—</pre>
-              </div>
+  const state = {
+    ui: "en",
+    lastHashtags: null,
+    lastBuildPack: null
+  };
 
-              <div class="box">
-                <div class="box-top">
-                  <div class="k">Final caption (text + hashtags)</div>
-                  <button class="btn small" type="button" id="copyFinalCaption">Copy</button>
-                </div>
-                <pre class="mono" id="finalCaption">—</pre>
-              </div>
-            </div>
-          </div>
+  const BASE = window.location.origin;
+  baseUrlPill.textContent = BASE;
 
-          <!-- 3) Next actions -->
-          <div class="card" id="cardNext">
-            <div class="card-h">
-              <div>
-                <div class="t">3) Next step (execution)</div>
-                <div class="m">What to do after publishing + what to measure.</div>
-              </div>
-              <button class="btn small" type="button" id="copyNext">Copy</button>
-            </div>
-            <div class="card-b">
-              <div class="box">
-                <div class="box-top">
-                  <div class="k">Checklist</div>
-                  <button class="btn small" type="button" id="copyChecklist">Copy</button>
-                </div>
-                <pre class="mono" id="nextChecklist">—</pre>
-              </div>
-            </div>
-          </div>
+  // Apply UI language
+  function t(key){
+    const dict = I18N[state.ui] || I18N.en;
+    return dict[key] ?? I18N.en[key] ?? key;
+  }
 
-          <!-- Raw JSON -->
-          <details class="details">
-            <summary>Raw JSON (debug)</summary>
-            <pre class="mono" id="rawJson" style="margin-top:10px;">{}</pre>
-          </details>
-        </div>
-      </div>
-    </section>
-  </div>
+  function applyI18n(){
+    document.documentElement.lang = state.ui === "ar" ? "ar" : "en";
+    document.documentElement.dir = state.ui === "ar" ? "rtl" : "ltr";
 
-  <script>
-    const $ = (s) => document.querySelector(s);
-    const esc = (s) => String(s ?? "");
-    const pretty = (o) => { try { return JSON.stringify(o, null, 2); } catch(e){ return String(o); } };
-    const parseJson = (t) => { try { return JSON.parse(t); } catch(e){ return null; } };
+    $("t_setup").textContent = t("setup");
+    $("t_setup_sub").textContent = t("setupSub");
+    $("t_creator_id").textContent = t("creatorId");
+    $("t_creator_hint").textContent = t("creatorHint");
+    $("t_lang").textContent = t("lang");
+    $("t_lang_hint").textContent = t("langHint");
+    $("t_title").textContent = t("title");
+    $("t_topic").textContent = t("topic");
+    $("t_topic_hint").textContent = t("topicHint");
+    $("t_mode").textContent = t("mode");
+    $("t_mode_hint").textContent = t("modeHint");
+    $("btnGenerate").textContent = t("generate");
+    $("btnHashtags").textContent = t("hashtags");
+    $("btnClear").textContent = t("clear");
+    $("t_outputs").textContent = t("outputs");
+    $("t_outputs_sub").textContent = t("outputsSub");
+    $("t_empty_title").textContent = t("emptyTitle");
+    $("t_empty_sub").textContent = t("emptySub");
+    $("t_debug").textContent = t("debug");
+    statusPill.textContent = t("serviceOnline");
+  }
 
-    const state = {
-      last: null,
-      kit: null,
-      plan: null,
-      promptPack: null,
-      uiLang: "en",
-      trendingHashtags: []
+  uiLang.addEventListener("change", () => {
+    state.ui = uiLang.value;
+    applyI18n();
+  });
+
+  // -------------------------------
+  // UI Helpers
+  // -------------------------------
+  function showAlert(msg, type="info"){
+    alertBox.hidden = false;
+    alertBox.className = "alert " + type;
+    alertBox.textContent = msg;
+  }
+  function clearAlert(){
+    alertBox.hidden = true;
+    alertBox.textContent = "";
+    alertBox.className = "alert";
+  }
+
+  function escapeHtml(str){
+    return String(str ?? "")
+      .replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;")
+      .replaceAll('"',"&quot;").replaceAll("'","&#039;");
+  }
+
+  async function copyToClipboard(text){
+    try{
+      await navigator.clipboard.writeText(text);
+      return true;
+    }catch(e){
+      // fallback
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+      return ok;
+    }
+  }
+
+  function card(title, bodyHtml, copyText=null, metaHtml=null){
+    const el = document.createElement("div");
+    el.className = "card";
+
+    const head = document.createElement("div");
+    head.className = "cardHead";
+
+    const h = document.createElement("div");
+    h.className = "cardTitle";
+    h.textContent = title;
+
+    const actions = document.createElement("div");
+    actions.className = "cardActions";
+
+    if(copyText !== null){
+      const btn = document.createElement("button");
+      btn.className = "btn small";
+      btn.textContent = t("copy");
+      btn.addEventListener("click", async () => {
+        const ok = await copyToClipboard(copyText);
+        btn.textContent = ok ? t("copying") : "Failed";
+        setTimeout(()=> btn.textContent = t("copy"), 900);
+      });
+      actions.appendChild(btn);
+    }
+
+    head.appendChild(h);
+    head.appendChild(actions);
+
+    const body = document.createElement("div");
+    body.className = "cardBody";
+    body.innerHTML = bodyHtml;
+
+    el.appendChild(head);
+    if(metaHtml){
+      const meta = document.createElement("div");
+      meta.className = "cardMeta";
+      meta.innerHTML = metaHtml;
+      el.appendChild(meta);
+    }
+    el.appendChild(body);
+    return el;
+  }
+
+  function preBlock(text){
+    return `<pre class="pre">${escapeHtml(text)}</pre>`;
+  }
+
+  function ensureResultsVisible(){
+    emptyState.style.display = "none";
+  }
+  function resetResults(){
+    results.innerHTML = "";
+    results.appendChild(emptyState);
+    emptyState.style.display = "block";
+  }
+
+  // -------------------------------
+  // Build a VEO3 prompt (client-side) from the generated kit
+  // (No on-screen text per your request; we focus on visuals + VO + SFX)
+  // -------------------------------
+  function buildVeoPromptSegments(payload, lang){
+    const title = payload?.title || "";
+    const script = payload?.script_teleprompter || "";
+    const shotList = Array.isArray(payload?.shot_list) ? payload.shot_list : [];
+    const hooks = payload?.hooks || {};
+    const bestHook = hooks?.C?.hook_text || hooks?.B?.hook_text || hooks?.A?.hook_text || "";
+
+    // Split into ~4 segments (0-8, 8-16, 16-24, 24-28)
+    // We keep it generic and clean for VEO3.
+    const baseStyle = (lang === "ar")
+      ? "فيديو عمودي 9:16، جودة عالية، إضاءة نظيفة، لقطة وجه قريبة + B-roll بسيط، أسلوب حديث احترافي، مونتاج سريع، بدون نص على الشاشة."
+      : "Vertical 9:16, high quality, clean lighting, close-up talking head + simple B-roll, modern professional style, fast pacing, no on-screen text.";
+
+    const vo = script.trim() ? script : bestHook;
+
+    const segments = [
+      {
+        t: "0-8s",
+        text:
+`[0-8s]
+STYLE: ${baseStyle}
+VISUAL: strong opening with confident presenter in a clean studio/office setup. Quick punch-in, shallow depth of field.
+AUDIO: voiceover (natural, energetic): "${vo.split("\n")[0] || bestHook}"
+SFX: subtle whoosh transitions, light ambient room tone.`
+      },
+      {
+        t: "8-16s",
+        text:
+`[8-16s]
+VISUAL: cut to B-roll related to the topic (laptop analytics dashboard, content calendar, social media planning). Return briefly to presenter.
+AUDIO: continue voiceover smoothly (no music overpowering speech).
+SFX: quick cuts, soft whoosh.`
+      },
+      {
+        t: "16-24s",
+        text:
+`[16-24s]
+VISUAL: presenter explains the 3-step solution; show supportive B-roll (checklist, calendar, metrics).
+AUDIO: voiceover continues. Maintain clarity and pacing.
+SFX: subtle transitions, no on-screen text.`
+      },
+      {
+        t: "24-28s",
+        text:
+`[24-28s]
+VISUAL: back to presenter, confident close-up, end with a clear call-to-action facial delivery.
+AUDIO: voiceover finishes with CTA line from script.
+SFX: gentle outro whoosh, end clean.`
+      }
+    ];
+
+    // Add extra context from shot_list if present
+    const extras = shotList.length ? "\nNOTES (shot ideas):\n- " + shotList.join("\n- ") : "";
+    return segments.map(s => s.text).join("\n\n") + extras;
+  }
+
+  // -------------------------------
+  // API Calls
+  // -------------------------------
+  async function fetchHashtags(){
+    clearAlert();
+    const creatorId = $("creatorId").value.trim();
+    const topic = $("topic").value.trim();
+    const lang = $("contentLang").value;
+
+    if(!creatorId){
+      showAlert(t("errMissing"), "warn");
+      return null;
+    }
+    if(!topic){
+      showAlert(t("errTopic"), "warn");
+      return null;
+    }
+
+    const url = new URL(BASE + "/v1/trending-hashtags");
+    url.searchParams.set("creator_id", creatorId);
+    url.searchParams.set("limit", "12");
+    url.searchParams.set("lang", lang);
+    url.searchParams.set("topic", topic);
+
+    const r = await fetch(url.toString(), { method: "GET" });
+    if(!r.ok){
+      const txt = await r.text();
+      throw new Error("hashtags: " + txt);
+    }
+    const json = await r.json();
+    state.lastHashtags = json;
+    return json;
+  }
+
+  async function buildPack(){
+    clearAlert();
+    const creatorId = $("creatorId").value.trim();
+    const ideaTitle = $("ideaTitle").value.trim();
+    const topic = $("topic").value.trim();
+    const lang = $("contentLang").value;
+    const mode = $("mode").value;
+
+    if(!creatorId){
+      showAlert(t("errMissing"), "warn");
+      return null;
+    }
+    if(!ideaTitle){
+      showAlert(t("errTitle"), "warn");
+      return null;
+    }
+
+    // Minimal payload (hide advanced fields; system handles defaults)
+    const payload = {
+      creator_id: creatorId,
+      idea_title: ideaTitle,
+      angle: "Saveable steps list",
+      value_promise: (lang === "ar") ? "خطة بسيطة: نفّذ، قِس، عدّل." : "Simple plan: execute, measure, iterate.",
+      preferred_length_sec: 28,
+      mode: mode
     };
 
-    function setDirByLang(lang){
-      const rtl = (lang === "ar");
-      document.documentElement.lang = lang;
-      document.documentElement.dir = rtl ? "rtl" : "ltr";
+    const r = await fetch(BASE + "/v1/build-pack", {
+      method: "POST",
+      headers: { "Content-Type": "application/json; charset=utf-8" },
+      body: JSON.stringify(payload)
+    });
+
+    const txt = await r.text();
+    if(!r.ok){
+      throw new Error("build-pack: " + txt);
     }
+    const json = JSON.parse(txt);
+    state.lastBuildPack = json;
+    return json;
+  }
 
-    async function copy(text){
-      try { await navigator.clipboard.writeText(String(text ?? "")); } catch(e) {}
-    }
+  // -------------------------------
+  // Render
+  // -------------------------------
+  function renderAll(){
+    resetResults();
+    ensureResultsVisible();
 
-    function artifactsByType(resp){
-      const arts = Array.isArray(resp?.artifacts) ? resp.artifacts : [];
-      const by = {};
-      for (const a of arts){
-        if (a?.type) by[a.type] = a.payload;
-      }
-      return by;
-    }
+    // 1) From build-pack: find ready_to_record_kit
+    const pack = state.lastBuildPack;
+    const hashtags = state.lastHashtags;
 
-    // --- VEO3 prompt builder (8s blocks) ---
-    function buildVeoBlocks(kit){
-      // We intentionally avoid on-screen text and build cinematic prompts.
-      const baseStyle =
-`STYLE:
-- vertical 9:16, cinematic lighting, clean modern look
-- sharp focus, shallow depth of field, subtle handheld movement
-- high pacing, quick cuts every ~1.5–2s, but not chaotic
-AUDIO:
-- voiceover in the same language as the script
-- subtle whoosh transitions, soft clicks for emphasis, light ambient bed
-RULES:
-- do NOT add any on-screen text or subtitles
-- keep visuals relevant to marketing + analytics + planning`;
+    if(pack?.artifacts?.length){
+      const kit = pack.artifacts.find(a => a.type === "ready_to_record_kit")?.payload;
 
-      const script = (kit?.script_teleprompter || "").trim();
-      const shots = Array.isArray(kit?.shot_list) ? kit.shot_list : [];
-      const cues  = Array.isArray(kit?.edit_cues) ? kit.edit_cues : [];
+      if(kit){
+        // VEO3 prompt card
+        const veo = buildVeoPromptSegments(kit, $("contentLang").value);
+        results.appendChild(card(
+          t("veoprompt"),
+          preBlock(veo),
+          veo
+        ));
 
-      // Split into ~4 segments: 0-8, 8-16, 16-24, 24-28
-      // We’ll derive VO chunks from the kit.timeline if available; else split script by lines.
-      const segs = [
-        { label: "0–8s",  start:0,  end:8,  vo:"" },
-        { label: "8–16s", start:8,  end:16, vo:"" },
-        { label: "16–24s",start:16, end:24, vo:"" },
-        { label: "24–28s",start:24, end:28, vo:"" }
-      ];
+        // Caption + hashtags card (prefer trending endpoint; else fallback to kit.hashtags)
+        const cap = kit.caption || "";
+        const tags = (hashtags?.hashtags && Array.isArray(hashtags.hashtags) && hashtags.hashtags.length)
+          ? hashtags.hashtags
+          : (Array.isArray(kit.hashtags) ? kit.hashtags : []);
 
-      if (kit?.timeline?.sections?.length){
-        // Collect section texts into the segments based on time range overlap
-        for (const sec of kit.timeline.sections){
-          const text = (sec?.text || "").trim();
-          if (!text) continue;
-          for (const s of segs){
-            const overlaps = !(sec.t_end <= s.start || sec.t_start >= s.end);
-            if (overlaps) s.vo += (s.vo ? "\n" : "") + text;
-          }
+        const mergedCaption = (cap ? cap.trim() : "") + "\n\n" + tags.join(" ");
+        const meta = hashtags
+          ? `<div class="metaLine"><span>${escapeHtml(t("source"))}:</span> <code>${escapeHtml(hashtags.source || "-")}</code></div>
+             <div class="metaLine"><span>${escapeHtml(t("updatedAt"))}:</span> <code>${escapeHtml(hashtags.updated_at || "-")}</code></div>`
+          : null;
+
+        results.appendChild(card(
+          t("captionTags"),
+          preBlock(mergedCaption.trim()),
+          mergedCaption.trim(),
+          meta
+        ));
+
+        // Hooks card
+        const hooks = kit.hooks || {};
+        const hooksText =
+`A) ${hooks?.A?.hook_text || "-"}
+B) ${hooks?.B?.hook_text || "-"}
+C) ${hooks?.C?.hook_text || "-"}`.trim();
+
+        results.appendChild(card(
+          t("hooks"),
+          preBlock(hooksText),
+          hooksText
+        ));
+
+        // Teleprompter card
+        if(kit.script_teleprompter){
+          results.appendChild(card(
+            t("teleprompter"),
+            preBlock(kit.script_teleprompter),
+            kit.script_teleprompter
+          ));
         }
+
+        // SRT card
+        if(kit.onscreen_text_srt){
+          results.appendChild(card(
+            t("srt"),
+            preBlock(kit.onscreen_text_srt),
+            kit.onscreen_text_srt
+          ));
+        }
+
+        // Timeline card
+        if(kit.timeline){
+          const tl = JSON.stringify(kit.timeline, null, 2);
+          results.appendChild(card(
+            t("timeline"),
+            preBlock(tl),
+            tl
+          ));
+        }
+      }
+
+      // Raw JSON card
+      const raw = JSON.stringify(pack, null, 2);
+      results.appendChild(card(
+        t("rawJson"),
+        preBlock(raw),
+        raw
+      ));
+    } else {
+      // No pack yet; show hashtags only if present
+      if(hashtags?.hashtags?.length){
+        const tagsOnly = hashtags.hashtags.join(" ");
+        results.appendChild(card(
+          t("captionTags"),
+          preBlock(tagsOnly),
+          tagsOnly,
+          `<div class="metaLine"><span>${escapeHtml(t("source"))}:</span> <code>${escapeHtml(hashtags.source || "-")}</code></div>
+           <div class="metaLine"><span>${escapeHtml(t("updatedAt"))}:</span> <code>${escapeHtml(hashtags.updated_at || "-")}</code></div>`
+        ));
       } else {
-        const lines = script.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
-        // Simple distribution
-        if (lines[0]) segs[0].vo = lines[0];
-        if (lines[1]) segs[1].vo = lines[1];
-        if (lines[2]) segs[2].vo = lines[2];
-        segs[3].vo = lines.slice(3).join("\n");
-      }
-
-      // Visual plan template
-      const visualTemplates = [
-`VISUALS:
-- fast opener: close-up talking head, confident delivery
-- cutaways: phone screen scrolling (generic UI), analytics graphs (generic), sticky notes checklist
-- quick punch-in zooms on key beats, tasteful`,
-`VISUALS:
-- b-roll sequence: hands typing campaign plan, calendar blocks, simple chart rising
-- quick cut to whiteboard with shapes (no readable text), pointer gestures
-- rhythmic cuts synced with VO`,
-`VISUALS:
-- solution montage: 3-step flow shown via objects (goal → action → measure)
-- shots: goal-setting notebook, executing task (mouse click), measurement dashboard (generic)
-- emphasize clarity and momentum`,
-`VISUALS:
-- CTA outro: talking head + upbeat close, slight camera push-in
-- end on confident look, clean background, soft vignette`
-      ];
-
-      const blocks = segs.map((s, i) => {
-        const vo = (s.vo || "").trim() || "(voiceover continues)";
-        const prompt =
-`${baseStyle}
-
-SEGMENT: ${s.label}
-${visualTemplates[i]}
-
-VOICEOVER (verbatim):
-${vo}
-
-SFX:
-- subtle whoosh on each cut
-- soft click on “step” moments
-- gentle riser into the last second
-
-EDITING NOTES:
-${(cues.length ? cues.map(x=>"- "+x).join("\n") : "- quick cuts and micro-zooms")}
-CAMERA NOTES:
-${(shots.length ? shots.map(x=>"- "+x).join("\n") : "- mix talking head + b-roll")}`;
-
-        return { label: `VEO3 Prompt — ${s.label}`, text: prompt };
-      });
-
-      return blocks;
-    }
-
-    // --- Trending hashtags fetch (backend should call external analytics service) ---
-    async function fetchTrendingHashtags(creatorId, limit=12){
-      // Backend contract suggestion:
-      // GET /v1/trending-hashtags?creator_id=...&limit=12
-      // returns: { hashtags: ["#...", ...], source:"...", updated_at:"..." }
-      const url = `${location.origin}/v1/trending-hashtags?creator_id=${encodeURIComponent(creatorId)}&limit=${encodeURIComponent(limit)}`;
-      try{
-        const res = await fetch(url, { method:"GET" });
-        if (!res.ok) throw new Error("no-endpoint");
-        const j = await res.json();
-        if (Array.isArray(j?.hashtags) && j.hashtags.length) return j.hashtags;
-        throw new Error("empty");
-      }catch(_){
-        // fallback: use hashtags from kit if endpoint not ready
-        return null;
+        emptyState.style.display = "block";
       }
     }
+  }
 
-    function renderHashtags(list){
-      const chips = $("#hashtagsChips");
-      chips.innerHTML = "";
-      const arr = Array.isArray(list) ? list : [];
-      for (const h of arr){
-        const el = document.createElement("span");
-        el.className = "chip";
-        el.textContent = h;
-        chips.appendChild(el);
+  // -------------------------------
+  // Buttons
+  // -------------------------------
+  $("btnHashtags").addEventListener("click", async () => {
+    try{
+      const btn = $("btnHashtags");
+      btn.disabled = true;
+      btn.textContent = "…";
+      const h = await fetchHashtags();
+      if(h){
+        showAlert("Hashtags loaded successfully.", "ok");
+        renderAll();
       }
-      const line = arr.join(" ");
-      $("#hashtagsLine").textContent = line || "—";
-      return line;
+    }catch(e){
+      lastErr.textContent = e.message || String(e);
+      showAlert(e.message || String(e), "danger");
+    }finally{
+      const btn = $("btnHashtags");
+      btn.disabled = false;
+      btn.textContent = t("hashtags");
     }
+  });
 
-    function renderVeo(kit){
-      const blocks = buildVeoBlocks(kit);
-      const wrap = $("#veoBlocks");
-      wrap.innerHTML = "";
-
-      // Copy-all text
-      const all = blocks.map(b => `### ${b.label}\n${b.text}`).join("\n\n");
-
-      $("#copyVeoAll").onclick = () => copy(all);
-
-      for (const b of blocks){
-        const box = document.createElement("div");
-        box.className = "box";
-
-        const top = document.createElement("div");
-        top.className = "box-top";
-
-        const k = document.createElement("div");
-        k.className = "k";
-        k.textContent = b.label;
-
-        const btn = document.createElement("button");
-        btn.className = "btn small";
-        btn.type = "button";
-        btn.textContent = "Copy";
-        btn.onclick = () => copy(b.text);
-
-        top.appendChild(k);
-        top.appendChild(btn);
-
-        const pre = document.createElement("pre");
-        pre.className = "mono";
-        pre.textContent = b.text;
-
-        box.appendChild(top);
-        box.appendChild(pre);
-        wrap.appendChild(box);
+  $("btnGenerate").addEventListener("click", async () => {
+    try{
+      const btn = $("btnGenerate");
+      btn.disabled = true;
+      btn.textContent = "…";
+      // Fetch hashtags first (best UX) if possible
+      try{ await fetchHashtags(); } catch(_e) {}
+      const p = await buildPack();
+      if(p){
+        showAlert("Pack generated successfully.", "ok");
+        renderAll();
       }
-
-      return all;
+    }catch(e){
+      lastErr.textContent = e.message || String(e);
+      showAlert(e.message || String(e), "danger");
+    }finally{
+      const btn = $("btnGenerate");
+      btn.disabled = false;
+      btn.textContent = t("generate");
     }
+  });
 
-    function buildCaptionLocalized(kit){
-      // We keep it simple and human: short, value-first, CTA.
-      // Language is already the creator/profile language in backend output.
-      const title = (kit?.title || "").trim();
-      const base = (kit?.caption || "").trim();
-      // Some builds include "title" inside caption; we normalize:
-      const captionText = base || title || "—";
-      return captionText;
-    }
+  $("btnClear").addEventListener("click", () => {
+    clearAlert();
+    state.lastHashtags = null;
+    state.lastBuildPack = null;
+    lastErr.textContent = "-";
+    resetResults();
+  });
 
-    function buildNextChecklist(resp, plan){
-      const expId = resp?.experiment_id || "—";
-      const scores = resp?.predicted?.scores
-        ? `Predicted scores: A=${resp.predicted.scores.A} | B=${resp.predicted.scores.B} | C=${resp.predicted.scores.C}`
-        : "";
+  // Surface JS crashes in UI
+  window.addEventListener("error", (ev) => {
+    lastErr.textContent = ev?.message || "JS error";
+    showAlert((ev?.message || "JS error") + " (see Debug)", "danger");
+  });
 
-      const mp = Array.isArray(plan?.measurement_points) ? plan.measurement_points : [];
-      const tests = Array.isArray(plan?.what_to_test) ? plan.what_to_test : [];
+  // Build info (simple)
+  $("buildInfo").textContent = new Date().toISOString();
 
-      return [
-        `1) Track this experiment_id: ${expId}`,
-        scores ? `2) ${scores}` : `2) Compare hooks A/B/C in the first 1–2 seconds`,
-        `3) Measure at: ${mp.length ? mp.join(", ") : "T+60m, T+24h, T+48h"}`,
-        `4) What to test next:`,
-        ...(tests.length ? tests.map(x=>`   - ${x}`) : [`   - Hook A/B/C`, `   - Caption + hashtags`, `   - Audio choice`]),
-        `5) If one variant wins: publish Part 2 within 24–48h using the same angle + one new insight.`,
-        `6) Then submit metrics via POST /v1/submit-metrics (views, likes, comments, shares, saves, avg watch time).`
-      ].filter(Boolean).join("\n");
-    }
-
-    async function renderAll(resp, creatorId){
-      const by = artifactsByType(resp);
-      const kit = by.ready_to_record_kit || null;
-      const plan = by.experiment_plan || null;
-      const pack = by.prompt_pack || null;
-
-      state.last = resp;
-      state.kit = kit;
-      state.plan = plan;
-      state.promptPack = pack;
-
-      $("#rawJson").textContent = pretty(resp);
-
-      // 1) VEO3 blocks
-      const veoAll = kit ? renderVeo(kit) : "";
-
-      // 2) Caption + hashtags (trending at publish time)
-      const captionText = kit ? buildCaptionLocalized(kit) : "—";
-      $("#captionText").textContent = captionText;
-
-      // Try trending endpoint; fallback to kit.hashtags
-      let hashtags = await fetchTrendingHashtags(creatorId, 12);
-      if (!hashtags) hashtags = Array.isArray(kit?.hashtags) ? kit.hashtags : [];
-      state.trendingHashtags = hashtags;
-
-      const hashtagsLine = renderHashtags(hashtags);
-
-      const finalCaption = [captionText, hashtagsLine].filter(x=>String(x||"").trim()).join("\n");
-      $("#finalCaption").textContent = finalCaption || "—";
-
-      // Copy hooks
-      $("#copyCaption").onclick = () => copy(finalCaption);
-      $("#copyCaptionText").onclick = () => copy(captionText);
-      $("#copyHashtags").onclick = () => copy(hashtagsLine);
-      $("#copyFinalCaption").onclick = () => copy(finalCaption);
-
-      $("#refreshHashtags").onclick = async () => {
-        let hs = await fetchTrendingHashtags(creatorId, 12);
-        if (!hs) hs = Array.isArray(kit?.hashtags) ? kit.hashtags : [];
-        state.trendingHashtags = hs;
-        const line = renderHashtags(hs);
-        const fc = [captionText, line].filter(x=>String(x||"").trim()).join("\n");
-        $("#finalCaption").textContent = fc || "—";
-      };
-
-      // 3) Next actions
-      const checklist = buildNextChecklist(resp, plan);
-      $("#nextChecklist").textContent = checklist;
-      $("#copyNext").onclick = () => copy(checklist);
-      $("#copyChecklist").onclick = () => copy(checklist);
-
-      // Global copy buttons
-      $("#copyAllText").onclick = () => {
-        const all = [
-          `=== VEO3 (8s blocks) ===\n${veoAll}`,
-          `\n=== TikTok Caption ===\n${finalCaption}`,
-          `\n=== Next Steps ===\n${checklist}`
-        ].join("\n\n");
-        copy(all);
-      };
-
-      $("#copyRaw").onclick = () => copy(pretty(resp));
-
-      // Update header line
-      $("#reqLine").textContent = `Generated. experiment_id: ${resp?.experiment_id || "—"}`;
-    }
-
-    async function callBuildPack(payload){
-      const url = `${location.origin}/v1/build-pack`;
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json; charset=utf-8" },
-        body: JSON.stringify(payload)
-      });
-      const text = await res.text();
-      const j = parseJson(text);
-      if (!res.ok){
-        throw new Error(j ? pretty(j) : text);
-      }
-      return j;
-    }
-
-    function fillExample(){
-      $("#creatorId").value = "147bdaf1-8e14-4619-a7d6-9d08edd785e3";
-      $("#ideaTitle").value = "3 خطوات سريعة لتحسين نتائجك في التسويق الرقمي";
-      $("#valuePromise").value = "خطة بسيطة: نفّذ، قِس، عدّل.";
-      $("#angle").value = "قائمة خطوات قابلة للحفظ";
-      $("#lengthSec").value = 28;
-    }
-
-    $("#btnExample").onclick = fillExample;
-
-    $("#btnGenerate").onclick = async () => {
-      const creator_id = $("#creatorId").value.trim();
-      const idea_title = $("#ideaTitle").value.trim();
-      const value_promise = $("#valuePromise").value.trim();
-
-      // Smart defaults (reduce user confusion)
-      const angle = ($("#angle").value.trim() || "Saveable checklist");
-      const preferred_length_sec = Number($("#lengthSec").value || 28);
-      const mode = "both";
-
-      if (!creator_id || !idea_title || !value_promise){
-        $("#reqLine").textContent = "Please fill: creator_id + idea title + value promise.";
-        return;
-      }
-
-      $("#reqLine").textContent = "Generating…";
-
-      try{
-        const payload = { creator_id, idea_title, angle, value_promise, preferred_length_sec, mode };
-        const resp = await callBuildPack(payload);
-        await renderAll(resp, creator_id);
-      }catch(err){
-        $("#reqLine").textContent = "Error. Open Raw JSON for details.";
-        $("#rawJson").textContent = String(err.message || err);
-      }
-    };
-
-    $("#clearOut").onclick = () => {
-      state.last = null; state.kit = null; state.plan = null; state.promptPack = null; state.trendingHashtags = [];
-      $("#reqLine").textContent = "No requests yet.";
-      $("#rawJson").textContent = "{}";
-      $("#veoBlocks").innerHTML = "";
-      $("#captionText").textContent = "—";
-      $("#hashtagsChips").innerHTML = "";
-      $("#hashtagsLine").textContent = "—";
-      $("#finalCaption").textContent = "—";
-      $("#nextChecklist").textContent = "—";
-    };
-
-    $("#uiLang").onchange = (e) => {
-      state.uiLang = e.target.value;
-      setDirByLang(state.uiLang);
-    };
-
-    // init
-    $("#baseUrlPill").textContent = location.origin;
-    setDirByLang($("#uiLang").value);
-  </script>
+  // init
+  applyI18n();
+  resetResults();
+})();
+</script>
 </body>
 </html>
