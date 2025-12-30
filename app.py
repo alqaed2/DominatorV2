@@ -383,6 +383,8 @@ def _build_pack(creator: Dict[str, Any], idea_title: str, angle: str, value_prom
 app = Flask(__name__, template_folder="templates", static_folder="static")
 if CORS:
     CORS(app, resources={r"/*": {"origins": "*"}})
+from services.trends_api import trends_bp
+app.register_blueprint(trends_bp)
 
 _init_db()
 
@@ -619,3 +621,4 @@ def report(experiment_id: str):
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "10000"))
     app.run(host="0.0.0.0", port=port, debug=True)
+
