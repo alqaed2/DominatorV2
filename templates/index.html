@@ -48,9 +48,12 @@
 
       <div class="grid2">
         <div class="field">
-          <label id="t_creator_id" for="creatorId">Creator ID</label>
-          <input id="creatorId" type="text" placeholder="e.g. 147bdaf1-..." />
-          <div class="hint" id="t_creator_hint">Required. Use the creator_id you got from /v1/onboard</div>
+          <label id="t_creator_id" for="creatorId">Session (auto)</label>
+          <div style="display:flex; gap:10px; align-items:center;">
+            <input id="creatorId" type="text" placeholder="auto-generated" readonly />
+            <button class="btn ghost" id="resetSession" type="button">Reset</button>
+          </div>
+          <div class="hint" id="t_creator_hint">Auto-created and stored in this browser (localStorage). No manual ID required.</div>
         </div>
 
         <div class="field">
@@ -167,6 +170,7 @@
       srt: "SRT captions",
       timeline: "Timeline",
       rawJson: "Raw JSON (for troubleshooting)",
+      advanced: "Advanced (SRT / Timeline / Raw JSON)",
       source: "source",
       updatedAt: "updated_at",
       errMissing: "Please fill Creator ID first.",
@@ -203,6 +207,7 @@
       srt: "ترجمة SRT",
       timeline: "التايم لاين",
       rawJson: "JSON الخام (للتشخيص)",
+      advanced: "متقدم (SRT / Timeline / Raw JSON)",
       source: "المصدر",
       updatedAt: "آخر تحديث",
       errMissing: "أدخل Creator ID أولًا.",
@@ -361,6 +366,39 @@
   }
 
   // -------------------------------
+  // Session / Creator ID (localStorage)
+  // We auto-create a creator_id on first use and persist it in the browser.
+  // -------------------------------
+  const LS_CREATOR_KEY = "dominatorv2_creator_id";
+
+  async function ensureSession(){
+    const input = $("creatorId");
+    const saved = (localStorage.getItem(LS_CREATOR_KEY) || "").trim();
+    if(saved){
+      input.value = saved;
+      return saved;
+    }
+
+    // Create a session server-side (also creates a creator profile with defaults)
+    const res = await fetch("/v1/session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({})
+    });
+
+    let data = null;
+    try { data = await res.json(); } catch(_) { /* ignore */ }
+
+    if(!res.ok || !data?.creator_id){
+      throw new Error(data?.error || "Failed to create session");
+    }
+
+    localStorage.setItem(LS_CREATOR_KEY, data.creator_id);
+    input.value = data.creator_id;
+    return data.creator_id;
+  }
+
+  // -------------------------------
   // Build a VEO3 prompt (client-side) from the generated kit
   // (No on-screen text per your request; we focus on visuals + VO + SFX)
   // -------------------------------
@@ -425,14 +463,10 @@ SFX: gentle outro whoosh, end clean.`
   // -------------------------------
   async function fetchHashtags(){
     clearAlert();
-    const creatorId = $("creatorId").value.trim();
+    const creatorId = await ensureSession();
     const topic = $("topic").value.trim();
     const lang = $("contentLang").value;
 
-    if(!creatorId){
-      showAlert(t("errMissing"), "warn");
-      return null;
-    }
     if(!topic){
       showAlert(t("errTopic"), "warn");
       return null;
@@ -456,16 +490,12 @@ SFX: gentle outro whoosh, end clean.`
 
   async function buildPack(){
     clearAlert();
-    const creatorId = $("creatorId").value.trim();
+    const creatorId = await ensureSession();
     const ideaTitle = $("ideaTitle").value.trim();
     const topic = $("topic").value.trim();
     const lang = $("contentLang").value;
     const mode = $("mode").value;
 
-    if(!creatorId){
-      showAlert(t("errMissing"), "warn");
-      return null;
-    }
     if(!ideaTitle){
       showAlert(t("errTitle"), "warn");
       return null;
@@ -538,55 +568,59 @@ SFX: gentle outro whoosh, end clean.`
           meta
         ));
 
-        // Hooks card
+        // Hooks card (clear + copy-ready)
         const hooks = kit.hooks || {};
-        const hooksText =
-`A) ${hooks?.A?.hook_text || "-"}
-B) ${hooks?.B?.hook_text || "-"}
-C) ${hooks?.C?.hook_text || "-"}`.trim();
+        const hookKeys = ["A","B","C"];
 
-        results.appendChild(card(
-          t("hooks"),
-          preBlock(hooksText),
-          hooksText
-        ));
+        const hooksCopy = hookKeys.map(k => {
+          const ht = hooks?.[k]?.hook_text || "-";
+          const os = hooks?.[k]?.onscreen_text || "-";
+          return `${k}) ${ht}
+On-screen: ${os}`;
+        }).join("\n\n");
 
-        // Teleprompter card
-        if(kit.script_teleprompter){
-          results.appendChild(card(
-            t("teleprompter"),
-            preBlock(kit.script_teleprompter),
-            kit.script_teleprompter
-          ));
+        const hooksHtml = `
+          <div style="display:grid;gap:12px">
+            ${hookKeys.map(k => {
+              const ht = escapeHtml(hooks?.[k]?.hook_text || "-");
+              const os = escapeHtml(hooks?.[k]?.onscreen_text || "-");
+              return `
+                <div style="border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:12px;background:rgba(255,255,255,.02)">
+                  <div style="font-weight:800;letter-spacing:.02em;margin-bottom:8px">Variant ${k}</div>
+                  <div style="line-height:1.55">${ht}</div>
+                  <div style="margin-top:8px;color:rgba(255,255,255,.65)"><strong>On-screen</strong>: ${os}</div>
+                </div>`;
+            }).join("")}
+          </div>
+        `;
+
+        results.appendChild(card(t("hooks"), hooksHtml, hooksCopy));
+
+        // Teleprompter script card
+        const teleText = kit.script_teleprompter || "";
+        if(teleText){
+          results.appendChild(card(t("teleprompter"), preBlock(teleText), teleText));
         }
 
-        // SRT card
-        if(kit.onscreen_text_srt){
-          results.appendChild(card(
-            t("srt"),
-            preBlock(kit.onscreen_text_srt),
-            kit.onscreen_text_srt
-          ));
+        // Advanced: SRT / Timeline / Raw JSON (collapsed)
+        const adv = document.createElement("details");
+        adv.className = "debug";
+        adv.innerHTML = `<summary>${escapeHtml(t("advanced"))}</summary><div style="display:grid;gap:12px;margin-top:12px" id="advInner"></div>`;
+        results.appendChild(adv);
+        const advInner = adv.querySelector("#advInner");
+
+        const srtText = kit.onscreen_text_srt || "";
+        if(srtText){
+          advInner.appendChild(card(t("srt"), preBlock(srtText), srtText));
         }
 
-        // Timeline card
-        if(kit.timeline){
-          const tl = JSON.stringify(kit.timeline, null, 2);
-          results.appendChild(card(
-            t("timeline"),
-            preBlock(tl),
-            tl
-          ));
+        const timelineText = kit.timeline ? JSON.stringify(kit.timeline, null, 2) : "";
+        if(timelineText){
+          advInner.appendChild(card(t("timeline"), preBlock(timelineText), timelineText));
         }
-      }
 
-      // Raw JSON card
-      const raw = JSON.stringify(pack, null, 2);
-      results.appendChild(card(
-        t("rawJson"),
-        preBlock(raw),
-        raw
-      ));
+        const raw = JSON.stringify(pack, null, 2);
+        advInner.appendChild(card(t("rawJson"), preBlock(raw), raw));
     } else {
       // No pack yet; show hashtags only if present
       if(hashtags?.hashtags?.length){
