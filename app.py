@@ -113,6 +113,62 @@ def _get_creator(creator_id: str) -> Optional[Dict[str, Any]]:
     return dict(row) if row else None
 
 
+
+def _resolve_creator_id(payload: dict | None = None) -> str | None:
+    """Resolve creator_id from body/header/query/cookie (in that order)."""
+    cid = None
+    if isinstance(payload, dict):
+        cid = payload.get("creator_id") or payload.get("creatorId") or payload.get("creatorID")
+    cid = cid or request.headers.get("X-Creator-Id") or request.headers.get("x-creator-id")
+    cid = cid or request.args.get("creator_id") or request.args.get("creatorId")
+    cid = cid or request.cookies.get("creator_id")
+    if isinstance(cid, str):
+        cid = cid.strip()
+    return cid or None
+
+
+def _normalize_lang(lang: str | None) -> str:
+    if not isinstance(lang, str) or not lang.strip():
+        return "en"
+    lang = lang.strip()
+    # Accept-Language can be: "ar-YE,ar;q=0.9,en;q=0.8"
+    lang = lang.split(",")[0].strip()
+    lang = lang.split("-")[0].strip().lower()
+    return lang or "en"
+
+
+def _ensure_creator(payload: dict | None = None, *, allow_auto_create: bool = True) -> dict:
+    """
+    Return a valid creator record.
+    - If creator_id exists: load it.
+    - If missing/unknown and allow_auto_create: create a minimal creator and return it.
+    """
+    cid = _resolve_creator_id(payload)
+    if cid:
+        creator = _get_creator(cid)
+        if creator is not None:
+            return creator
+
+    if not allow_auto_create:
+        raise ValueError("creator_id غير موجود")
+
+    # Auto-create (UI-friendly): the UI can store this creator_id in localStorage or cookie.
+    creator_id = _create_creator_id()
+    lang = _normalize_lang(
+        (payload or {}).get("language")
+        or request.headers.get("X-Lang")
+        or request.headers.get("Accept-Language")
+    )
+
+    profile = {
+        "display_name": (payload or {}).get("display_name") or "Creator",
+        "primary_niche": (payload or {}).get("primary_niche") or "general",
+        "primary_language": lang,
+        "created_at": datetime.utcnow().isoformat() + "Z",
+    }
+    _upsert_creator(creator_id, profile)
+    return _get_creator(creator_id)
+
 def _upsert_creator(creator: Dict[str, Any]) -> None:
     with _db() as conn:
         conn.execute(
@@ -381,8 +437,26 @@ def _build_pack(creator: Dict[str, Any], idea_title: str, angle: str, value_prom
 
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
+# Ensure UTF-8 JSON output (Arabic-safe)
+try:
+    app.json.ensure_ascii = False
+except Exception:
+    pass
+app.config["JSON_AS_ASCII"] = False
+
 if CORS:
     CORS(app, resources={r"/*": {"origins": "*"}})
+
+@app.after_request
+def _add_utf8_headers(resp):
+    # Make sure JSON responses declare UTF-8 (helps some clients/console tools)
+    try:
+        if resp.mimetype == "application/json" and "charset" not in (resp.content_type or "").lower():
+            resp.content_type = resp.content_type + "; charset=utf-8"
+    except Exception:
+        pass
+    return resp
+
 from services.trends_api import trends_bp
 app.register_blueprint(trends_bp)
 
@@ -424,6 +498,7 @@ def api_index():
                 "health": "GET /health",
                 "ui": "GET /",
                 "onboard": "POST /v1/onboard",
+            "session": "GET|POST /v1/session",
                 "daily_brief": "POST /v1/daily-brief",
                 "build_pack": "POST /v1/build-pack",
                 "submit_metrics": "POST /v1/submit-metrics",
@@ -467,37 +542,104 @@ def onboard():
     }
     _upsert_creator(creator)
 
-    return jsonify(
+    resp = jsonify(
         {
             "creator_id": creator_id,
             "message": f"تم إنشاء ملفك بنجاح. الوضع الافتراضي: {mode_default.capitalize()}",
             "mode_default": mode_default,
         }
     )
+    resp.set_cookie("creator_id", creator_id, max_age=60 * 60 * 24 * 365, samesite="Lax", secure=True)
+    return resp
 
 
 @app.post("/v1/daily-brief")
 def daily_brief():
     data = _require_json()
-    creator_id = data.get("creator_id")
     n_ideas = int(data.get("n_ideas") or 3)
 
-    if not creator_id:
-        return jsonify({"error": "creator_id مطلوب"}), 400
-
-    creator = _get_creator(creator_id)
-    if not creator:
-        return jsonify({"error": "creator_id غير موجود. نفّذ /v1/onboard أولًا أو ثبّت قاعدة البيانات على Disk."}), 404
+    try:
+        creator = _ensure_creator(data, allow_auto_create=True)
+        creator_id = creator.get("id")
+    except Exception:
+        return jsonify({"error": "تعذر إنشاء جلسة المستخدم"}), 400
 
     ideas = _generate_ideas(creator, n=n_ideas)
-    return jsonify({"creator_id": creator_id, "ideas": ideas})
+    resp = jsonify({"creator_id": creator_id, "ideas": ideas})
+    try:
+        if creator_id:
+            resp.set_cookie("creator_id", creator_id, max_age=60 * 60 * 24 * 365, samesite="Lax", secure=True)
+    except Exception:
+        pass
+    return resp
+@app.get("/v1/session")
+def get_session():
+    """
+    UI helper: get (or create) a creator session id.
+    The UI can store creator_id in localStorage; we also set a cookie for convenience.
+    """
+    creator = None
+    cid = _resolve_creator_id(None)
+    if cid:
+        creator = _get_creator(cid)
 
+    created = False
+    if creator is None:
+        creator = _ensure_creator({}, allow_auto_create=True)
+        created = True
+
+    resp = jsonify({
+        "creator_id": creator.get("id"),
+        "created": created,
+        "profile": {
+            "display_name": creator.get("display_name"),
+            "primary_niche": creator.get("primary_niche"),
+            "primary_language": creator.get("primary_language"),
+        },
+    })
+    # Cookie is optional, but it removes the need to keep passing creator_id manually.
+    resp.set_cookie("creator_id", creator.get("id"), max_age=60 * 60 * 24 * 365, samesite="Lax", secure=True)
+    return resp
+
+
+@app.post("/v1/session")
+def post_session():
+    """
+    Create or update a session.
+    If you pass an existing creator_id (header/body/query/cookie) we update its profile.
+    Otherwise we create a new creator and return its id.
+    """
+    data = request.get_json(silent=True) or {}
+    cid = _resolve_creator_id(data)
+    creator = _get_creator(cid) if cid else None
+
+    if creator is None:
+        creator = _ensure_creator(data, allow_auto_create=True)
+        created = True
+    else:
+        created = False
+        # Optional profile update from UI (kept minimal)
+        updates = {}
+        for k in ("display_name", "primary_niche", "primary_language"):
+            if k in data and isinstance(data[k], str) and data[k].strip():
+                updates[k] = data[k].strip()
+        if updates:
+            _upsert_creator(creator.get("id"), updates)
+            creator = _get_creator(creator.get("id"))
+
+    resp = jsonify({"creator_id": creator.get("id"), "created": created, "status": "ok"})
+    resp.set_cookie("creator_id", creator.get("id"), max_age=60 * 60 * 24 * 365, samesite="Lax", secure=True)
+    return resp
 
 @app.post("/v1/build-pack")
 def build_pack():
     data = _require_json()
 
-    creator_id = data.get("creator_id")
+    try:
+        creator = _ensure_creator(data, allow_auto_create=True)
+        creator_id = creator.get("id")
+    except Exception:
+        return jsonify({"error": "تعذر إنشاء جلسة المستخدم"}), 400
     idea_title = data.get("idea_title")
     angle = data.get("angle")
     value_promise = data.get("value_promise")
@@ -555,19 +697,29 @@ def build_pack():
             ),
         )
         conn.commit()
-
-    return jsonify(result)
-
-
+    resp = jsonify(result)
+    try:
+        if creator_id:
+            resp.set_cookie("creator_id", creator_id, max_age=60 * 60 * 24 * 365, samesite="Lax", secure=True)
+    except Exception:
+        pass
+    return resp
 @app.post("/v1/submit-metrics")
 def submit_metrics():
     data = _require_json()
-    creator_id = data.get("creator_id")
     experiment_id = data.get("experiment_id")
+    try:
+        creator = _ensure_creator(data, allow_auto_create=True)
+        creator_id = creator.get("id")
+    except Exception:
+        creator_id = None
     payload = data.get("metrics") or data.get("payload") or data
-
-    if not creator_id or not experiment_id:
-        return jsonify({"error": "creator_id و experiment_id مطلوبين"}), 400
+    if not experiment_id:
+        return jsonify({"error": "experiment_id مطلوب"}), 400
+    if not creator_id:
+        # Last resort: create a session so metrics can still be recorded.
+        creator = _ensure_creator({}, allow_auto_create=True)
+        creator_id = creator.get("id")
 
     metric_id = str(uuid.uuid4())
     with _db() as conn:
@@ -579,15 +731,18 @@ def submit_metrics():
             (metric_id, _utc_now_iso(), experiment_id, creator_id, _json_dumps(payload)),
         )
         conn.commit()
-
-    return jsonify({"status": "ok", "metric_id": metric_id})
-
-
+    resp = jsonify({"status": "ok", "metric_id": metric_id})
+    try:
+        if creator_id:
+            resp.set_cookie("creator_id", creator_id, max_age=60 * 60 * 24 * 365, samesite="Lax", secure=True)
+    except Exception:
+        pass
+    return resp
 @app.get("/v1/report/<experiment_id>")
 def report(experiment_id: str):
-    creator_id = request.args.get("creator_id")
+    creator_id = _resolve_creator_id(None) or request.args.get("creator_id")
     if not creator_id:
-        return jsonify({"error": "creator_id مطلوب كـ query param"}), 400
+        return jsonify({"error": "creator_id مطلوب (query/header/cookie)"}), 400
 
     with _db() as conn:
         exp = conn.execute(
