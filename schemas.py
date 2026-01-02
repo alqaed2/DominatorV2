@@ -57,7 +57,15 @@ class BuildPackRequest(BaseModel):
     angle: str
     value_promise: str
     preferred_length_sec: int = 28
-    mode: Literal["kit", "prompt_pack", "both"] = "kit"
+    # Optional context knobs (UI may omit; API can use them for smarter outputs)
+    topic: str | None = None
+    language: str | None = None
+    audience_country: str | None = None
+    publish_hour_local: int | None = None
+    timezone_offset_min: int | None = None
+
+    # Compatibility: older UIs used "manual" to mean "kit".
+    mode: Literal["kit", "prompt_pack", "both", "manual"] = "kit"
 
 
 class Artifact(BaseModel):
