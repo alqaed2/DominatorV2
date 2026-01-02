@@ -1,443 +1,259 @@
-from __future__ import annotations
-
-import json
+import os
 import uuid
+import logging
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional
 
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
-from werkzeug.middleware.proxy_fix import ProxyFix
-from pydantic import ValidationError
-from sqlalchemy.orm import Session
 
 from config import settings
 from db import SessionLocal, init_db
-from models import Creator, Experiment, AuditLog
+from models import SessionModel, MetricEvent
 from schemas import (
-    BuildPackRequest,
     OnboardRequest,
-    ManualMetricsRequest,
-)
-from services.generator import GeneratorService
-from services.artifacts import ArtifactsService
-from services.scoring import ScoringService
-from services.experiments import ExperimentsService
-from services.trends_provider import trends_bp
-from utils.logging import get_logger, safe_json
-
-log = get_logger("app")
-
-app = Flask(__name__, static_folder="static", template_folder="templates")
-app.json.ensure_ascii = False
-app.json.sort_keys = False
-CORS(app)
-
-# Trust Render proxy headers so rate limiting keys use the real client IP.
-app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
-
-# Basic abuse protection (note: in-memory storage is per-worker; add Redis later for strict global limits).
-limiter = Limiter(
-    get_remote_address,
-    app=app,
-    default_limits=[f"{settings.MAX_REQUESTS_PER_IP_PER_MIN}/minute"],
+    DailyBriefRequest,
+    BuildPackRequest,
+    SubmitMetricsRequest,
 )
 
-app.register_blueprint(trends_bp)
+from services import generator as generator_svc
+from services import artifacts as artifacts_svc
 
-# Ensure DB schema exists at process start. Failing fast is preferable to
-# serving a broken UI with 500s (e.g., missing tables / bad DATABASE_URL).
-try:
-    init_db()
-    log.info("DB schema ensured")
-except Exception:
-    log.exception("DB init failed")
-    raise
+
+VERSION = os.getenv("APP_VERSION", "0.1.0")
+
+logging.basicConfig(level=getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO))
+log = logging.getLogger("dominator")
 
 
 def _iso_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def _db() -> Session:
+def _json_error(message: str, code: int = 400, extra: Optional[Dict[str, Any]] = None):
+    payload = {"error": message}
+    if extra:
+        payload.update(extra)
+    return jsonify(payload), code
+
+
+def _db():
     return SessionLocal()
 
 
-def _json_error(message: str, *, status: int = 400, details: Any = None):
-    payload: Dict[str, Any] = {"error": message}
-    if details is not None:
-        payload["details"] = details
-    return jsonify(payload), status
+app = Flask(__name__)
+CORS(
+    app,
+    resources={r"/*": {"origins": settings.CORS_ORIGINS}},
+    supports_credentials=True,
+)
 
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=["600 per hour"],
+    storage_uri=settings.RATELIMIT_STORAGE_URI,
+)
 
-def _payload_guard() -> Optional[Tuple[Any, int]]:
-    # Render/Gunicorn might not always set Content-Length.
-    if request.content_length is not None and request.content_length > settings.MAX_REQUEST_BYTES:
-        return _json_error(
-            f"Payload too large (>{settings.MAX_REQUEST_BYTES} bytes)",
-            status=413,
-        )
-    return None
-
-
-def _audit(db: Session, *, creator_id: Optional[str], event: str, payload: Any, severity: str = "INFO", blocked: bool = False):
-    try:
-        db.add(
-            AuditLog(
-                creator_id=creator_id,
-                event=event,
-                severity=severity,
-                payload_json=safe_json(payload),
-                blocked=blocked,
-            )
-        )
-        db.commit()
-    except Exception:
-        db.rollback()
-        log.exception("Audit log insert failed")
-
-
-def _create_creator(
-    db: Session,
-    *,
-    display_name: str = "New Creator",
-    language: str = "en",
-    primary_niche: str = "general",
-    goal: str = "followers",
-    tone: str = "educational",
-) -> Creator:
-    c = Creator(
-        display_name=display_name,
-        goal=goal,
-        primary_niche=primary_niche,
-        # models.Creator stores sub_niches as a JSON string.
-        sub_niches="[]",
-        language=language,
-        tone=tone,
-        constraints_json="{}",
-    )
-    db.add(c)
-    db.commit()
-    db.refresh(c)
-    return c
-
-
-def _get_creator(db: Session, creator_id: str) -> Optional[Creator]:
-    # Creator IDs are UUID strings (see models.Creator.id).
-    creator_id = (creator_id or "").strip()
-    if not creator_id:
-        return None
-    return db.get(Creator, creator_id)
-
-
-def _best_variant(variants: Dict[str, Dict[str, Any]]) -> str:
-    best = "A"
-    best_score = -1.0
-    for k in ["A", "B", "C"]:
-        v = variants.get(k) or {}
-        s = float(v.get("score") or 0.0)
-        if s > best_score:
-            best_score = s
-            best = k
-    return best
-
-
-def _time_bucket(hour: int) -> str:
-    if 5 <= hour <= 10:
-        return "morning"
-    if 11 <= hour <= 16:
-        return "day"
-    if 17 <= hour <= 21:
-        return "evening"
-    return "night"
-
-
-def _build_caption(
-    *,
-    lang: str,
-    title: str,
-    value_promise: Optional[str] = None,
-    country: Optional[str] = None,
-    publish_hour_local: Optional[int] = None,
-    cta_keyword: Optional[str] = None,
-) -> str:
-    """Deterministic, production-safe caption builder.
-
-    If country/time is missing, it still produces a strong caption.
-    """
-    title = (title or "").strip()
-    value_promise = (value_promise or "").strip()
-    country = (country or "").strip().upper() or None
-
-    # Time-of-day framing
-    tod = None
-    if publish_hour_local is not None:
-        try:
-            h = int(publish_hour_local)
-            tod = _time_bucket(h)
-        except Exception:
-            tod = None
-
-    # Micro personalization
-    if lang.startswith("ar"):
-        openers = {
-            "morning": "صباح الإنتاجية:",
-            "day": "خلّينا نختصرها:",
-            "evening": "قبل ما يخلص اليوم:",
-            "night": "آخر الليل، فكرة مجنونة:",
-        }
-        opener = openers.get(tod or "", "خلّينا ندخل في الزبدة:")
-        cta = cta_keyword or "اكتب رأيك"
-        location = f" ({country})" if country else ""
-        if value_promise:
-            return f"{opener} {title}{location}\n{value_promise}\n— {cta} 👇"
-        return f"{opener} {title}{location}\n— {cta} 👇"
-    else:
-        openers = {
-            "morning": "Morning boost:",
-            "day": "Quick breakdown:",
-            "evening": "Before the day ends:",
-            "night": "Late-night idea:",
-        }
-        opener = openers.get(tod or "", "Quick breakdown:")
-        cta = cta_keyword or "Comment your take"
-        location = f" ({country})" if country else ""
-        if value_promise:
-            return f"{opener} {title}{location}\n{value_promise}\n— {cta} ↓"
-        return f"{opener} {title}{location}\n— {cta} ↓"
-
-
-@app.get("/")
-def home():
-    return render_template("index.html")
+# Ensure DB schema exists on startup. We *do not* crash the web process if DB is temporarily unavailable;
+# endpoints that require DB will surface a clear error, and Render will still detect the open port.
+DB_INIT_OK = True
+try:
+    init_db()
+    log.info("DB init: OK")
+except Exception:
+    DB_INIT_OK = False
+    log.exception("DB init failed; continuing without DB")
 
 
 @app.get("/health")
 def health():
-    return jsonify({"status": "ok", "at": _iso_now()})
-
-
-@app.get("/v1/session")
-def get_session():
-    creator_id = request.args.get("creator_id") or ""
-    if not creator_id:
-        return _json_error("creator_id is required", status=400)
-    db = _db()
-    try:
-        c = _get_creator(db, creator_id)
-        if not c:
-            return _json_error("creator not found", status=404)
-        return jsonify({"creator_id": str(c.id), "profile": {"display_name": c.display_name}})
-    finally:
-        db.close()
+    return jsonify({"status": "ok", "version": VERSION, "ts": _iso_now(), "db_ready": DB_INIT_OK})
 
 
 @app.post("/v1/session")
+@limiter.limit("60 per minute")
 def post_session():
+    """
+    Creates a session row used for tracking metrics/onboarding.
+    """
+    session_id = uuid.uuid4().hex
     db = _db()
     try:
-        c = _create_creator(db, display_name="Browser Session")
-        return jsonify({"creator_id": str(c.id), "message": "ok"})
+        s = SessionModel(id=session_id, created_at=datetime.now(timezone.utc))
+        db.add(s)
+        db.commit()
+        return jsonify({"session_id": session_id, "created_at": s.created_at.isoformat()})
+    except Exception as e:
+        db.rollback()
+        # Do not crash: return clear error
+        log.exception("Failed to create session")
+        return _json_error("Failed to create session", 500, {"details": str(e)})
     finally:
         db.close()
 
 
 @app.post("/v1/onboard")
-def onboard():
-    db = _db()
-    try:
-        data = request.get_json(silent=True) or {}
-        try:
-            req = OnboardRequest(**data)
-        except ValidationError as e:
-            return _json_error("validation_error", status=422, details=e.errors())
-
-        # Create a new creator profile
-        c = _create_creator(
-            db,
-            display_name=req.display_name or "New Creator",
-            language=req.language or "ar",
-            primary_niche=req.primary_niche or "general",
-            goal=req.goal or "followers",
-            tone=req.tone or "educational",
-        )
-
-        # Update optional sub_niches + constraints
-        c.sub_niches = safe_json(req.sub_niches)
-        c.constraints_json = safe_json(req.constraints or {})
-        db.add(c)
-        db.commit()
-
-        return jsonify({"creator_id": str(c.id), "message": "created"})
-    finally:
-        db.close()
-
-
-@app.post("/v1/build-pack")
-@limiter.limit("30/minute")
-def build_pack():
-    guard = _payload_guard()
-    if guard:
-        return guard
-
+@limiter.limit("60 per minute")
+def post_onboard():
     data = request.get_json(silent=True) or {}
     try:
-        req = BuildPackRequest(**data)
-    except ValidationError as e:
-        return _json_error("validation_error", status=422, details=e.errors())
-
-    db = _db()
-    try:
-        c = _get_creator(db, req.creator_id)
-        if not c:
-            return _json_error("creator not found", status=404)
-
-        gen = GeneratorService()
-        scorer = ScoringService()
-        artifacts_svc = ArtifactsService()
-        exp_svc = ExperimentsService()
-
-        # Generate candidates
-        variants_list = gen.generate_variants(
-            idea_title=req.idea_title,
-            angle=req.angle,
-            niche=c.primary_niche,
-        )
-        variants = {v["key"]: v for v in variants_list}
-        predicted_scores = {k: float((variants.get(k) or {}).get("score") or 0.0) for k in ["A", "B", "C"]}
-
-        # Deterministic blueprint + ready-to-record kit
-        blueprint = artifacts_svc.build_blueprint(req.idea_title, req.angle, req.value_promise, req.preferred_length_sec)
-        best_key = _best_variant(variants)
-        best = variants.get(best_key) or {}
-        kit = artifacts_svc.render_ready_to_record_kit(
-            blueprint=blueprint,
-            selected_hook_text=str(best.get("hook_text") or "").strip(),
-            selected_onscreen_text=str(best.get("onscreen_text") or "").strip(),
-            hooks_map={k: {"hook_text": (variants.get(k) or {}).get("hook_text"), "onscreen_text": (variants.get(k) or {}).get("onscreen_text")} for k in ["A", "B", "C"]},
-            keywords=[w for w in (req.idea_title.split() if req.idea_title else [])[:6]],
-        )
-
-        # Caption upgrade (country/time aware, deterministic)
-        kit["caption"] = _build_caption(
-            lang=c.language,
-            title=req.idea_title,
-            value_promise=req.value_promise,
-            country=req.audience_country,
-            publish_hour_local=req.publish_hour_local,
-            cta_keyword=req.cta_keyword,
-        )
-
-        # Optional scoring mode
-        score_payload = None
-        if req.mode in ("score", "both"):
-            score_payload = scorer.score_pack(
-                idea_title=req.idea_title,
-                angle=req.angle,
-                niche=c.primary_niche,
-                variants=variants,
-            )
-
-        # Store experiment
-        exp = exp_svc.create_experiment(
-            db=db,
-            creator_id=str(c.id),
-            idea_title=req.idea_title,
-            angle=req.angle,
-            niche=c.primary_niche,
-            mode=req.mode,
-            variants=variants,
-            predicted_scores=predicted_scores,
-        )
-
-        _audit(
-            db,
-            creator_id=str(c.id),
-            event="build_pack",
-            payload={
-                "experiment_id": exp.id,
-                "mode": req.mode,
-                "idea_title": req.idea_title,
-                "angle": req.angle,
-            },
-        )
-
-        return jsonify(
-            {
-                "creator_id": str(c.id),
-                "experiment_id": exp.id,
-                "variants": variants,
-                "predicted_scores": predicted_scores,
-                "ready_to_record_kit": kit,
-                "score": score_payload,
-            }
-        )
+        payload = OnboardRequest(**data)
     except Exception as e:
-        _audit(
-            db,
-            creator_id=req.creator_id if "req" in locals() else None,
-            event="build_pack_error",
-            payload={"error": str(e)},
-            severity="ERROR",
-        )
-        log.exception("build_pack failed")
-        return _json_error("internal_error", status=500)
-    finally:
-        db.close()
+        return _json_error("Invalid payload", 400, {"details": str(e)})
 
-
-@app.post("/v1/metrics/manual")
-@limiter.limit("60/minute")
-def manual_metrics():
-    data = request.get_json(silent=True) or {}
-    try:
-        req = ManualMetricsRequest(**data)
-    except ValidationError as e:
-        return _json_error("validation_error", status=422, details=e.errors())
+    session_id = data.get("session_id")
+    if not session_id:
+        return _json_error("session_id is required", 400)
 
     db = _db()
     try:
-        exp = db.get(Experiment, req.experiment_id)
-        if not exp:
-            return _json_error("experiment not found", status=404)
+        s = db.get(SessionModel, session_id)
+        if not s:
+            return _json_error("Session not found", 404)
 
-        # Append snapshot
-        try:
-            lst = json.loads(exp.metrics_json or "[]")
-        except Exception:
-            lst = []
-        lst.append(
-            {
-                "at": _iso_now(),
-                "label": req.label,
-                "views": req.views,
-                "likes": req.likes,
-                "comments": req.comments,
-                "shares": req.shares,
-                "avg_watch_time": req.avg_watch_time,
-                "completion_rate": req.completion_rate,
-            }
-        )
-        exp.metrics_json = safe_json(lst)
-        db.add(exp)
+        s.project_name = payload.project_name
+        s.niche = payload.niche
+        s.audience = payload.audience
+        s.goal = payload.goal
+        s.platforms = ",".join(payload.platforms)
+        s.language = payload.language
+        s.onboarded_at = datetime.now(timezone.utc)
+
         db.commit()
-
-        _audit(
-            db,
-            creator_id=exp.creator_id,
-            event="manual_metrics",
-            payload={"experiment_id": exp.id, "label": req.label},
-        )
-
         return jsonify({"ok": True})
+    except Exception as e:
+        db.rollback()
+        log.exception("Onboard failed")
+        return _json_error("Onboard failed", 500, {"details": str(e)})
     finally:
         db.close()
 
 
-# As a safety net for environments that import the module without running the earlier init block.
-init_db()
+@app.post("/v1/daily-brief")
+@limiter.limit("120 per minute")
+def post_daily_brief():
+    data = request.get_json(silent=True) or {}
+    try:
+        payload = DailyBriefRequest(**data)
+    except Exception as e:
+        return _json_error("Invalid payload", 400, {"details": str(e)})
+
+    brief = generator_svc.generate_daily_brief(payload.idea, payload.language)
+    return jsonify({"brief": brief})
+
+
+@app.post("/v1/generate/variants")
+@limiter.limit("120 per minute")
+def post_variants():
+    data = request.get_json(silent=True) or {}
+    idea = (data.get("idea") or "").strip()
+    if not idea:
+        return _json_error("idea is required", 400)
+    language = (data.get("language") or "ar").strip()
+    count = int(data.get("count") or 8)
+
+    variants = generator_svc.build_variants_for_idea(idea=idea, count=count, language=language)
+    return jsonify({"variants": variants})
+
+
+@app.post("/v1/artifacts/blueprint")
+@limiter.limit("120 per minute")
+def post_blueprint():
+    data = request.get_json(silent=True) or {}
+    idea_title = (data.get("idea_title") or data.get("title") or "").strip()
+    angle = (data.get("angle") or "").strip()
+    value_promise = (data.get("value_promise") or "").strip()
+    video_seconds = int(data.get("video_seconds") or 45)
+    language = (data.get("language") or "ar").strip()
+
+    if not idea_title or not angle or not value_promise:
+        return _json_error("idea_title/title, angle, and value_promise are required", 400)
+
+    blueprint = artifacts_svc.build_blueprint(
+        idea_title=idea_title,
+        angle=angle,
+        value_promise=value_promise,
+        video_seconds=video_seconds,
+        language=language,
+    )
+    kit = artifacts_svc.render_ready_to_record_kit(blueprint=blueprint, language=language)
+    return jsonify({"blueprint": blueprint, "kit": kit})
+
+
+@app.post("/v1/experiments/plan")
+@limiter.limit("120 per minute")
+def post_experiment_plan():
+    data = request.get_json(silent=True) or {}
+    try:
+        payload = BuildPackRequest(**data)
+    except Exception as e:
+        return _json_error("Invalid payload", 400, {"details": str(e)})
+
+    plan = artifacts_svc.build_experiment_plan(
+        title=payload.title,
+        niche=payload.niche,
+        goal="",
+        platforms=["tiktok", "reels", "shorts"],
+        days=7,
+        language=payload.language,
+    )
+    return jsonify({"plan": plan})
+
+
+@app.post("/v1/prompts/pack")
+@limiter.limit("120 per minute")
+def post_prompt_pack():
+    data = request.get_json(silent=True) or {}
+    title = (data.get("title") or "").strip()
+    if not title:
+        return _json_error("title is required", 400)
+    style = (data.get("style") or "cinematic").strip()
+    language = (data.get("language") or "ar").strip()
+
+    pack = artifacts_svc.build_prompt_pack(title=title, style=style, outputs=None, language=language)
+    return jsonify({"pack": pack})
+
+
+@app.post("/v1/metrics/submit")
+@limiter.limit("240 per minute")
+def post_metrics_submit():
+    data = request.get_json(silent=True) or {}
+    try:
+        payload = SubmitMetricsRequest(**data)
+    except Exception as e:
+        return _json_error("Invalid payload", 400, {"details": str(e)})
+
+    db = _db()
+    try:
+        s = db.get(SessionModel, payload.session_id)
+        if not s:
+            return _json_error("Session not found", 404)
+
+        ev = MetricEvent(
+            session_id=payload.session_id,
+            platform=payload.platform,
+            content_id=payload.content_id,
+            metrics_json=payload.metrics,
+            ts=payload.ts or _iso_now(),
+        )
+        db.add(ev)
+        db.commit()
+        return jsonify({"ok": True})
+    except Exception as e:
+        db.rollback()
+        log.exception("Metrics submit failed")
+        return _json_error("Metrics submit failed", 500, {"details": str(e)})
+    finally:
+        db.close()
+
+
+# ---- boot ----
+# DB schema initialization already attempted above.
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=False)
+    port = int(os.getenv("PORT", "5000"))
+    app.run(host="0.0.0.0", port=port)
