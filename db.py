@@ -9,6 +9,10 @@ _db_url = settings.DATABASE_URL
 if _db_url.startswith("postgres://"):
     _db_url = _db_url.replace("postgres://", "postgresql://", 1)
 
+# Prefer psycopg v3 driver (better compatibility across Python versions).
+if _db_url.startswith("postgresql://"):
+    _db_url = _db_url.replace("postgresql://", "postgresql+psycopg://", 1)
+
 connect_args = {"check_same_thread": False} if _db_url.startswith("sqlite") else {}
 
 engine = create_engine(
