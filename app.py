@@ -1,779 +1,632 @@
+from __future__ import annotations
+
 import json
-import os
-import sqlite3
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
-from flask import Flask, jsonify, request, render_template, send_from_directory
+from flask import Flask, jsonify, render_template, request
+from flask_cors import CORS
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from werkzeug.middleware.proxy_fix import ProxyFix
+from pydantic import ValidationError
+from sqlalchemy.orm import Session
 
-# Optional CORS
-try:
-    from flask_cors import CORS
-except Exception:
-    CORS = None
+from config import settings
+from db import SessionLocal, init_db
+from models import Creator, Experiment
+from schemas import (
+    BuildPackRequest,
+    DailyBriefRequest,
+    MetricsPoint,
+    OnboardRequest,
+    SubmitMetricsRequest,
+)
+from services import artifacts as artifacts_svc
+from services import experiments as experiments_svc
+from services import generator as generator_svc
+from services import genome as genome_svc
+from services.policy import evaluate_policy
+from services.trends_api import trends_bp
+from services.trends_provider import get_trends_provider
+from utils.logging import get_logger, safe_json
 
 
-APP_DIR = os.path.dirname(os.path.abspath(__file__))
-
-# مهم: اجعل DB_PATH قابل للتغيير من Render Environment
-# لو ركبت Persistent Disk في Render على /var/data استخدم:
-# DB_PATH=/var/data/dominator.db
-DB_PATH = os.getenv("DB_PATH", os.path.join(APP_DIR, "data", "dominator.db"))
-
-SERVICE_NAME = os.getenv("SERVICE_NAME", "AI_DOMINATOR_TikTok_First")
-ALLOW_ANON_BUILD_PACK = os.getenv("ALLOW_ANON_BUILD_PACK", "1") == "1"
+VERSION = "DominatorV2 (Flask) — CEO/CTO Stabilized"
+log = get_logger("app")
 
 
-def _utc_now_iso() -> str:
+app = Flask(__name__, static_folder="static", template_folder="templates")
+app.json.ensure_ascii = False
+app.json.sort_keys = False
+CORS(app)
+
+# Trust Render proxy headers so rate limiting keys use the real client IP.
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
+
+# Basic abuse protection (note: in-memory storage is per-worker; add Redis later for strict global limits).
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=[f"{settings.MAX_REQUESTS_PER_IP_PER_MIN}/minute"],
+)
+
+app.register_blueprint(trends_bp)
+
+
+def _iso_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def _ensure_db_dir() -> None:
-    db_dir = os.path.dirname(DB_PATH)
-    if db_dir and not os.path.exists(db_dir):
-        os.makedirs(db_dir, exist_ok=True)
+def _db() -> Session:
+    return SessionLocal()
 
 
-def _db() -> sqlite3.Connection:
-    _ensure_db_dir()
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+def _json_error(message: str, *, status: int = 400, details: Any = None):
+    payload: Dict[str, Any] = {"error": message}
+    if details is not None:
+        payload["details"] = details
+    return jsonify(payload), status
 
 
-def _init_db() -> None:
-    with _db() as conn:
-        cur = conn.cursor()
-
-        cur.execute(
-            """
-            CREATE TABLE IF NOT EXISTS creators (
-                creator_id TEXT PRIMARY KEY,
-                created_at TEXT NOT NULL,
-                display_name TEXT,
-                goal TEXT,
-                primary_niche TEXT,
-                sub_niches_json TEXT,
-                language TEXT,
-                tone TEXT,
-                constraints_json TEXT,
-                tiktok_profile_url TEXT,
-                mode_default TEXT
-            )
-            """
+def _payload_guard() -> Optional[Tuple[Any, int]]:
+    # Render/Gunicorn might not always set Content-Length.
+    if request.content_length is not None and request.content_length > settings.MAX_REQUEST_BYTES:
+        return _json_error(
+            f"Payload too large (>{settings.MAX_REQUEST_BYTES} bytes)",
+            status=413,
         )
-
-        cur.execute(
-            """
-            CREATE TABLE IF NOT EXISTS experiments (
-                experiment_id TEXT PRIMARY KEY,
-                created_at TEXT NOT NULL,
-                creator_id TEXT NOT NULL,
-                idea_title TEXT,
-                angle TEXT,
-                value_promise TEXT,
-                preferred_length_sec INTEGER,
-                mode TEXT,
-                result_json TEXT NOT NULL
-            )
-            """
-        )
-
-        cur.execute(
-            """
-            CREATE TABLE IF NOT EXISTS metrics (
-                id TEXT PRIMARY KEY,
-                created_at TEXT NOT NULL,
-                experiment_id TEXT NOT NULL,
-                creator_id TEXT NOT NULL,
-                payload_json TEXT NOT NULL
-            )
-            """
-        )
-
-        conn.commit()
+    return None
 
 
-def _json_dumps(obj: Any) -> str:
-    return json.dumps(obj, ensure_ascii=False)
-
-
-def _json_loads(s: str) -> Any:
-    return json.loads(s) if s else None
-
-
-def _get_creator(creator_id: str) -> Optional[Dict[str, Any]]:
-    with _db() as conn:
-        row = conn.execute(
-            "SELECT * FROM creators WHERE creator_id = ?",
-            (creator_id,),
-        ).fetchone()
-
-    return dict(row) if row else None
-
-
-
-def _resolve_creator_id(payload: dict | None = None) -> str | None:
-    """Resolve creator_id from body/header/query/cookie (in that order)."""
-    cid = None
-    if isinstance(payload, dict):
-        cid = payload.get("creator_id") or payload.get("creatorId") or payload.get("creatorID")
-    cid = cid or request.headers.get("X-Creator-Id") or request.headers.get("x-creator-id")
-    cid = cid or request.args.get("creator_id") or request.args.get("creatorId")
-    cid = cid or request.cookies.get("creator_id")
-    if isinstance(cid, str):
-        cid = cid.strip()
-    return cid or None
-
-
-def _normalize_lang(lang: str | None) -> str:
-    if not isinstance(lang, str) or not lang.strip():
-        return "en"
-    lang = lang.strip()
-    # Accept-Language can be: "ar-YE,ar;q=0.9,en;q=0.8"
-    lang = lang.split(",")[0].strip()
-    lang = lang.split("-")[0].strip().lower()
-    return lang or "en"
-
-
-def _ensure_creator(payload: dict | None = None, *, allow_auto_create: bool = True) -> dict:
-    """
-    Return a valid creator record.
-    - If creator_id exists: load it.
-    - If missing/unknown and allow_auto_create: create a minimal creator and return it.
-    """
-    cid = _resolve_creator_id(payload)
-    if cid:
-        creator = _get_creator(cid)
-        if creator is not None:
-            return creator
-
-    if not allow_auto_create:
-        raise ValueError("creator_id غير موجود")
-
-    # Auto-create (UI-friendly): the UI can store this creator_id in localStorage or cookie.
-    creator_id = _create_creator_id()
-    lang = _normalize_lang(
-        (payload or {}).get("language")
-        or request.headers.get("X-Lang")
-        or request.headers.get("Accept-Language")
-    )
-
-    profile = {
-        "display_name": (payload or {}).get("display_name") or "Creator",
-        "primary_niche": (payload or {}).get("primary_niche") or "general",
-        "primary_language": lang,
-        "created_at": datetime.utcnow().isoformat() + "Z",
-    }
-    _upsert_creator(creator_id, profile)
-    return _get_creator(creator_id)
-
-def _upsert_creator(creator: Dict[str, Any]) -> None:
-    with _db() as conn:
-        conn.execute(
-            """
-            INSERT INTO creators (
-                creator_id, created_at, display_name, goal, primary_niche,
-                sub_niches_json, language, tone, constraints_json,
-                tiktok_profile_url, mode_default
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(creator_id) DO UPDATE SET
-                display_name=excluded.display_name,
-                goal=excluded.goal,
-                primary_niche=excluded.primary_niche,
-                sub_niches_json=excluded.sub_niches_json,
-                language=excluded.language,
-                tone=excluded.tone,
-                constraints_json=excluded.constraints_json,
-                tiktok_profile_url=excluded.tiktok_profile_url,
-                mode_default=excluded.mode_default
-            """,
-            (
-                creator.get("creator_id"),
-                creator.get("created_at") or _utc_now_iso(),
-                creator.get("display_name"),
-                creator.get("goal"),
-                creator.get("primary_niche"),
-                creator.get("sub_niches_json"),
-                creator.get("language"),
-                creator.get("tone"),
-                creator.get("constraints_json"),
-                creator.get("tiktok_profile_url"),
-                creator.get("mode_default"),
-            ),
-        )
-        conn.commit()
-
-
-def _require_json() -> Dict[str, Any]:
-    data = request.get_json(silent=True)
-    if data is None:
-        return {}
-    if not isinstance(data, dict):
-        return {}
-    return data
-
-
-def _score_hook(hook_text: str) -> Tuple[float, List[str]]:
-    """
-    سكور بسيط (0-100) + أسباب.
-    الهدف: يعطيك ترتيب سريع A/B/C بدون تعقيد.
-    """
-    reasons: List[str] = []
-    text = (hook_text or "").strip()
-
-    if not text:
-        return 0.0, ["هوك فارغ."]
-
-    # طول مثالي تقريبًا 6-14 كلمة
-    words = [w for w in text.split() if w.strip()]
-    wc = len(words)
-    score = 60.0
-
-    if 6 <= wc <= 14:
-        score += 18
-        reasons.append("طول مناسب لأول 1–2 ثانية.")
-    elif wc < 6:
-        score -= 10
-        reasons.append("قصير جدًا؛ قد لا يوضح الوعد بسرعة.")
-    else:
-        score -= 8
-        reasons.append("طويل نسبيًا؛ قد يقلل من سرعة الالتقاط.")
-
-    # محفزات الفضول
-    triggers = ["خطأ", "3", "سر", "صادم", "بدون", "في أقل", "خلال", "دقيقة", "ثانية", "لا تفعل"]
-    hit = sum(1 for t in triggers if t in text)
-    if hit >= 1:
-        score += min(12, hit * 4)
-        reasons.append("فيه محفز فضول/قائمة/وعد واضح.")
-
-    # علامات الإيقاع
-    if "…" in text or "..." in text or "؟" in text:
-        score += 4
-        reasons.append("استخدام (Open Loop) أو سؤال يعزز الاستمرار.")
-
-    score = max(0.0, min(100.0, score))
-    return float(round(score, 2)), reasons
-
-
-def _build_hooks(primary_niche: str, angle: str) -> Dict[str, Dict[str, str]]:
-    niche = primary_niche or "مجالك"
-    return {
-        "A": {
-            "hook_text": f"إذا كنت في {niche} وتفعل هذا… فأنت تخسر بدون أن تدري.",
-            "onscreen_text": f"توقف عن هذا في {niche}!",
-        },
-        "B": {
-            "hook_text": f"3 أخطاء تمنعك من التقدم في {niche}… رقم 2 صادم.",
-            "onscreen_text": "3 أخطاء قاتلة",
-        },
-        "C": {
-            "hook_text": f"في أقل من 30 ثانية… طريقة عملية لتحسن نتيجتك في {niche}.",
-            "onscreen_text": "طريقة خلال 30 ثانية",
-        },
-    }
-
-
-def _generate_ideas(creator: Dict[str, Any], n: int = 3) -> List[Dict[str, Any]]:
-    primary_niche = creator.get("primary_niche") or "مجالك"
-
-    angles = [
-        ("تفكيك خطأ + بديل عملي", f"خطأ شائع يمنعك من النجاح في {primary_niche}", "خطوة واحدة تصحح المسار خلال يوم واحد."),
-        ("قائمة خطوات قابلة للحفظ", f"3 خطوات سريعة لتحسين نتائجك في {primary_niche}", "خطة بسيطة: نفّذ، قِس، عدّل."),
-        ("سبب جذري + علاج مباشر", f"السبب الحقيقي لعدم تقدمك في {primary_niche} (والحل)", "تغيير صغير يرفع نتائجك بشكل ملحوظ."),
-    ]
-
-    out: List[Dict[str, Any]] = []
-    for angle, title, value_promise in angles[: max(1, n)]:
-        hooks = _build_hooks(primary_niche, angle)
-        variants = []
-        for key in ["A", "B", "C"]:
-            score, why = _score_hook(hooks[key]["hook_text"])
-            variants.append(
-                {
-                    "key": key,
-                    "hook_text": hooks[key]["hook_text"],
-                    "onscreen_text": hooks[key]["onscreen_text"],
-                    "minimum_fix": "أضف CTA واحدًا واضحًا: (اكتب كلمة X بالتعليقات) أو (احفظ الفيديو لقائمة الخطوات).",
-                    "score": score,
-                    "why": why,
-                }
-            )
-
-        out.append(
-            {
-                "angle": angle,
-                "title": title,
-                "value_promise": value_promise,
-                "variants": variants,
-            }
-        )
-
-    return out
-
-
-def _build_pack(creator: Dict[str, Any], idea_title: str, angle: str, value_promise: str, preferred_length_sec: int, mode: str) -> Dict[str, Any]:
-    primary_niche = creator.get("primary_niche") or "مجالك"
-    hooks = _build_hooks(primary_niche, angle)
-
-    # سكور hooks
-    scores = {}
-    why_map = {}
-    for k in ["A", "B", "C"]:
-        sc, why = _score_hook(hooks[k]["hook_text"])
-        scores[k] = sc
-        why_map[k] = why
-
-    # اختَر الأفضل تلقائيًا كـ default hook داخل السكربت
-    best_key = max(scores, key=lambda kk: scores[kk])
-    best_hook = hooks[best_key]["hook_text"]
-    best_onscreen = hooks[best_key]["onscreen_text"]
-
-    # سكربت (قابل للتسجيل)
-    script = "\n".join(
-        [
-            best_hook,
-            f"معظم الناس في {primary_niche} يقعوا في خطأ واحد…",
-            "الحل في 3 خطوات: (1) حدد الهدف بدقة، (2) نفّذ خطوة واحدة اليوم، (3) راقب النتيجة وعدّل.",
-            "اكتب كلمة (جاهز) بالتعليقات وسأرسل لك الخطوات بشكل أوضح.",
-        ]
-    )
-
-    srt = "\n".join(
-        [
-            "1",
-            "00:00:00,000 --> 00:00:02,000",
-            "{HOOK}",
-            "",
-            "2",
-            "00:00:02,000 --> 00:00:08,000",
-            f"معظم الناس في {primary_niche} يقعوا في خطأ واحد…",
-            "",
-            "3",
-            "00:00:08,000 --> 00:00:22,000",
-            "الحل في 3 خطوات: (1) حدد الهدف بدقة، (2) نفّذ خطوة واحدة اليوم، (3) راقب النتيجة وعدّل.",
-            "",
-            "4",
-            "00:00:22,000 --> 00:00:28,000",
-            "اكتب كلمة (جاهز) بالتعليقات وسأرسل لك الخطوات بشكل أوضح.",
-        ]
-    )
-
-    experiment_id = str(uuid.uuid4())
-    artifact_id = str(uuid.uuid4())
-
-    payload_ready = {
-        "id": artifact_id,
-        "title": idea_title,
-        "keywords": [primary_niche, "نصائح"],
-        "hooks": hooks,
-        "script_teleprompter": script,
-        "onscreen_text_srt": srt,
-        "caption": f"{value_promise}\n# {primary_niche}",
-        "hashtags": [f"#{primary_niche.replace(' ', '')}", "#تعلم", "#نصائح"],
-        "edit_cues": [
-            "تغيير لقطة/زووم بسيط كل 1.5–2 ثانية.",
-            "أظهر الكلمات المفتاحية على الشاشة.",
-            "اجعل الـHook بصوت قوي + نص كبير.",
-        ],
-        "shot_list": [
-            "لقطة قريبة للوجه/المتحدث مع إضاءة جيدة.",
-            "B-roll بسيط أثناء ذكر الخطوات.",
-            "لقطة ختام مع CTA على الشاشة.",
-        ],
-        "timeline": {
-            "video_seconds": int(preferred_length_sec or 28),
-            "sections": [
-                {"type": "hook", "t_start": 0, "t_end": 2, "text": best_hook, "onscreen": best_onscreen},
-                {"type": "problem", "t_start": 2, "t_end": 8, "text": f"معظم الناس في {primary_niche} يقعوا في خطأ واحد…", "onscreen": "الخطأ الشائع"},
-                {"type": "solution", "t_start": 8, "t_end": 22, "text": "الحل في 3 خطوات: (1) حدد الهدف بدقة، (2) نفّذ خطوة واحدة اليوم، (3) راقب النتيجة وعدّل.", "onscreen": "الحل (3 خطوات)"},
-                {"type": "cta", "t_start": 22, "t_end": 28, "text": "اكتب كلمة (جاهز) بالتعليقات وسأرسل لك الخطوات بشكل أوضح.", "onscreen": "اكتب (جاهز) 👇"},
-            ],
-        },
-    }
-
-    payload_experiment_plan = {
-        "what_to_test": [
-            "Hook A/B/C (أول 1-2 ثانية)",
-            "Length (قصير/متوسط عند الحاجة)",
-            "Caption keywords + On-screen text",
-            "Audio (Trending vs Original إذا كان مناسبًا)",
-        ],
-        "measurement_points": ["T+60m", "T+24h", "T+48h"],
-        "win_function": {
-            "phase_1": ["views_velocity (60-180m)", "shares_per_1k_views"],
-            "phase_2": ["comments_per_1k_views", "engagement_rate", "follow_rate_if_available"],
-        },
-        "next_best_action": "إذا فاز Variant ما: اصنع Part 2 بنفس الزاوية مع تطعيم معلومة جديدة.",
-    }
-
-    payload_prompt_pack = {
-        "title": idea_title,
-        "prompts": {
-            "hooks": f"ولّد 3 Hooks مختلفة (A/B/C) عن {idea_title}، كل Hook <= 14 كلمة، مع نص شاشة قصير.",
-            "script": f"اكتب سكربت TikTok ({preferred_length_sec} ثانية) عن: {idea_title} بزاوية: {angle} وبقيمة: {value_promise}. ابدأ بهوك قوي خلال 1 ثانية.",
-            "editing": "اقترح إرشادات مونتاج سريع: تقطيع، تكبير، نص على الشاشة كل 1-2 ثانية، مع إيقاع عالي.",
-            "visual": "اقترح شكل بصري للـFrame الأول + نص كبير واضح + ألوان متناسقة.",
-            "next_series": "اقترح 5 أفكار (Part 2/3/4) مبنية على نفس الزاوية لتعزيز سلسلة محتوى.",
-        },
-    }
-
-    result = {
-        "experiment_id": experiment_id,
-        "predicted": {
-            "note": "اختبر Hooks A/B/C للحصول على دليل نتيجة (Lift).",
-            "scores": scores,
-        },
-        "artifacts": [
-            {"type": "ready_to_record_kit", "payload": payload_ready},
-            {"type": "experiment_plan", "payload": payload_experiment_plan},
-            {"type": "prompt_pack", "payload": payload_prompt_pack},
-        ],
-    }
-
-    return result
-
-
-app = Flask(__name__, template_folder="templates", static_folder="static")
-# Ensure UTF-8 JSON output (Arabic-safe)
-try:
-    app.json.ensure_ascii = False
-except Exception:
-    pass
-app.config["JSON_AS_ASCII"] = False
-
-if CORS:
-    CORS(app, resources={r"/*": {"origins": "*"}})
-
-@app.after_request
-def _add_utf8_headers(resp):
-    # Make sure JSON responses declare UTF-8 (helps some clients/console tools)
-    try:
-        if resp.mimetype == "application/json" and "charset" not in (resp.content_type or "").lower():
-            resp.content_type = resp.content_type + "; charset=utf-8"
-    except Exception:
-        pass
-    return resp
-
-from services.trends_api import trends_bp
-app.register_blueprint(trends_bp)
-
-_init_db()
+@app.before_request
+def _before_request():
+    guarded = _payload_guard()
+    if guarded is not None:
+        return guarded
+    return None
 
 
 @app.get("/")
 def home():
-    # صفحة UI بسيطة لتجربة POST من المتصفح
     return render_template("index.html")
 
 
 @app.get("/favicon.ico")
 def favicon():
-    # منع ضوضاء 404 في الكونسل
     return ("", 204)
 
 
 @app.get("/health")
 def health():
-    return jsonify(
-        {
-            "status": "ok",
-            "service": SERVICE_NAME,
-            "time": _utc_now_iso(),
-            "db_path": DB_PATH,
-        }
-    )
+    return jsonify({"status": "ok", "version": VERSION, "ts": _iso_now()})
 
 
 @app.get("/api")
 def api_index():
-    # JSON سريع للاندبوينتس (لو تحب)
     return jsonify(
         {
-            "status": "ok",
-            "service": SERVICE_NAME,
+            "name": "DominatorV2",
+            "version": VERSION,
             "endpoints": {
                 "health": "GET /health",
-                "ui": "GET /",
+                "session": "GET|POST /v1/session",
                 "onboard": "POST /v1/onboard",
-            "session": "GET|POST /v1/session",
                 "daily_brief": "POST /v1/daily-brief",
                 "build_pack": "POST /v1/build-pack",
+                "trending_hashtags": "POST /v1/trending-hashtags",
                 "submit_metrics": "POST /v1/submit-metrics",
-                "report": "GET /v1/report/<experiment_id>?creator_id=...",
+                "report": "GET /v1/report/<experiment_id>",
             },
         }
     )
 
 
-@app.post("/v1/onboard")
-def onboard():
-    data = _require_json()
-
-    display_name = data.get("display_name")
-    goal = data.get("goal")
-    primary_niche = data.get("primary_niche")
-    sub_niches = data.get("sub_niches") or []
-    language = data.get("language", "ar")
-    tone = data.get("tone", "educational")
-    constraints = data.get("constraints") or {}
-    tiktok_profile_url = data.get("tiktok_profile_url")
-
-    if not display_name or not goal or not primary_niche:
-        return jsonify({"error": "حقول مطلوبة: display_name, goal, primary_niche"}), 400
-
-    creator_id = str(uuid.uuid4())
-    mode_default = "manual" if not tiktok_profile_url else "linked"
-
-    creator = {
-        "creator_id": creator_id,
-        "created_at": _utc_now_iso(),
-        "display_name": display_name,
-        "goal": goal,
-        "primary_niche": primary_niche,
-        "sub_niches_json": _json_dumps(sub_niches),
-        "language": language,
-        "tone": tone,
-        "constraints_json": _json_dumps(constraints),
-        "tiktok_profile_url": tiktok_profile_url,
-        "mode_default": mode_default,
-    }
-    _upsert_creator(creator)
-
-    resp = jsonify(
-        {
-            "creator_id": creator_id,
-            "message": f"تم إنشاء ملفك بنجاح. الوضع الافتراضي: {mode_default.capitalize()}",
-            "mode_default": mode_default,
-        }
+def _create_creator(
+    db: Session,
+    *,
+    display_name: str = "New Creator",
+    language: str = "en",
+    primary_niche: str = "general",
+    goal: str = "followers",
+    tone: str = "educational",
+) -> Creator:
+    c = Creator(
+        display_name=display_name,
+        goal=goal,
+        primary_niche=primary_niche,
+        sub_niches_json="[]",
+        language=language,
+        tone=tone,
+        constraints_json="{}",
+        tiktok_profile_url=None,
+        baseline_views=0.0,
+        baseline_engagement_rate=0.0,
+        baseline_share_rate=0.0,
     )
-    resp.set_cookie("creator_id", creator_id, max_age=60 * 60 * 24 * 365, samesite="Lax", secure=True)
-    return resp
+    db.add(c)
+    db.commit()
+    db.refresh(c)
+    genome_svc.ensure_genome(db, c)
+    return c
 
 
-@app.post("/v1/daily-brief")
-def daily_brief():
-    data = _require_json()
-    n_ideas = int(data.get("n_ideas") or 3)
-
+def _get_creator(db: Session, creator_id: str) -> Optional[Creator]:
     try:
-        creator = _ensure_creator(data, allow_auto_create=True)
-        creator_id = creator.get("id")
+        cid = int(creator_id)
     except Exception:
-        return jsonify({"error": "تعذر إنشاء جلسة المستخدم"}), 400
+        return None
+    return db.get(Creator, cid)
 
-    ideas = _generate_ideas(creator, n=n_ideas)
-    resp = jsonify({"creator_id": creator_id, "ideas": ideas})
-    try:
-        if creator_id:
-            resp.set_cookie("creator_id", creator_id, max_age=60 * 60 * 24 * 365, samesite="Lax", secure=True)
-    except Exception:
-        pass
-    return resp
+
+def _best_variant(variants: Dict[str, Dict[str, Any]]) -> str:
+    best = "A"
+    best_score = -1.0
+    for k in ["A", "B", "C"]:
+        v = variants.get(k) or {}
+        s = float(v.get("score") or 0.0)
+        if s > best_score:
+            best_score = s
+            best = k
+    return best
+
+
+def _build_caption(
+    *,
+    lang: str,
+    title: str,
+    value_promise: str,
+    country: Optional[str] = None,
+    publish_hour_local: Optional[int] = None,
+    cta_keyword: Optional[str] = None,
+) -> str:
+    """Deterministic, production-safe caption builder.
+
+    If country/time is missing, it still produces a strong caption.
+    """
+    title = (title or "").strip()
+    value_promise = (value_promise or "").strip()
+    country = (country or "").strip().upper() or None
+
+    # Time-of-day framing
+    tod = None
+    if publish_hour_local is not None:
+        try:
+            h = int(publish_hour_local)
+            if 5 <= h <= 10:
+                tod = "morning"
+            elif 11 <= h <= 16:
+                tod = "day"
+            elif 17 <= h <= 21:
+                tod = "evening"
+            else:
+                tod = "night"
+        except Exception:
+            tod = None
+
+    kw = (cta_keyword or "").strip() or ("خطة" if lang == "ar" else "PLAN")
+
+    if lang == "ar":
+        lead = {
+            "morning": "قبل ما يبدأ يومك…",
+            "day": "لو تبغى نتيجة اليوم…",
+            "evening": "قبل ما تقفل يومك…",
+            "night": "إذا أنت صاحي الآن…",
+        }.get(tod, "")
+        loc = f" ({country})" if country else ""
+        body = f"{title}{loc}\n{value_promise}"
+        cta = f"\n\nاكتب كلمة ({kw}) بالتعليقات إذا تبغى النسخة المختصرة."  # purposeful CTA
+        return (lead + "\n" if lead else "") + body + cta
+
+    # default: English
+    lead = {
+        "morning": "Before your day starts…",
+        "day": "If you want results today…",
+        "evening": "Before you end your day…",
+        "night": "If you’re still awake…",
+    }.get(tod, "")
+    loc = f" ({country})" if country else ""
+    body = f"{title}{loc}\n{value_promise}"
+    cta = f"\n\nComment '{kw}' and I’ll send you the short version."  # purposeful CTA
+    return (lead + "\n" if lead else "") + body + cta
+
+
+def _build_veo3_prompt(kit: Dict[str, Any], *, lang: str = "en") -> str:
+    """High-signal VEO3 prompt with explicit camera/lighting/audio guidance.
+
+    Output is segmented ~8s chunks to match the UI’s card-based copying.
+    """
+    timeline = kit.get("timeline") or {}
+    secs = int(timeline.get("video_seconds") or 28)
+    sections = timeline.get("sections") or []
+
+    # Pull a short VO line per section from the teleprompter (best-effort)
+    tele = (kit.get("script_teleprompter") or "").strip()
+    tele_lines = [ln.strip() for ln in tele.splitlines() if ln.strip()]
+    vo_seed = " ".join(tele_lines[:6])[:220]
+
+    # Base style (safe, brandable)
+    if lang == "ar":
+        base = (
+            "إخراج فيديو عمودي 9:16، واقعي سينمائي، إضاءة نظيفة، جودة عالية. "
+            "كاميرا: 24–35mm، عمق مجال خفيف، حركة بسيطة (handheld micro-movement). "
+            "ألوان محايدة، تباين متوسط. لا تضع نصوص أو شعارات داخل الفيديو (سأضيفها في المونتاج). "
+            "الصوت: Voice-over عربي واضح + موسيقى خلفية خفيفة منخفضة + SFX خفيف للنقرات والانتقالات."
+        )
+        seg_label = "المقطع"
+        vo_label = "VO"
+    else:
+        base = (
+            "Vertical 9:16, realistic cinematic look, clean studio lighting, high clarity. "
+            "Camera: 24–35mm, mild depth of field, subtle handheld micro-movement. "
+            "Neutral color grade, medium contrast. No on-video text or logos (added in post). "
+            "Audio: clear voice-over + low background music + light UI click/transition SFX."
+        )
+        seg_label = "Segment"
+        vo_label = "VO"
+
+    def bucket(t0: int) -> Tuple[int, int]:
+        t1 = min(secs, t0 + 8)
+        return t0, t1
+
+    # Build 0-8, 8-16, 16-24, 24-end
+    parts = []
+    for t0 in range(0, secs, 8):
+        a, b = bucket(t0)
+        # Map to timeline section type best-effort
+        focus = "hook" if a == 0 else "solution" if a <= 16 else "cta" if b >= secs else "problem"
+        if lang == "ar":
+            focus_txt = {
+                "hook": "لقطة افتتاحية قوية: وجه/منتج في مركز الكادر، تعبير واثق، قطع سريع بعد 1.5 ثانية.",
+                "problem": "عرض المشكلة بمثال بصري بسيط (B-roll سريع) مع إبقاء المتحدث في الإطار.",
+                "solution": "شرح الخطوات مع تغييرات لقطة/زووم كل 1.5–2 ثانية + B-roll مطابق.",
+                "cta": "لقطة ختام ثابتة، نظرة للكاميرا، إشارة يد بسيطة، إيقاع هادئ.",
+            }[focus]
+            cam = {
+                "hook": "حركة: push-in خفيف، تركيز على العينين.",
+                "problem": "حركة: pan بسيط لقطع المشهد.",
+                "solution": "حركة: jump-cuts محسوبة + لقطة كتف/يدين.",
+                "cta": "حركة: ثابت + تباطؤ بسيط في النهاية.",
+            }[focus]
+        else:
+            focus_txt = {
+                "hook": "Strong opener: face/product centered, confident expression, quick cut at ~1.5s.",
+                "problem": "Show the problem with simple visual example (fast B-roll) while keeping speaker present.",
+                "solution": "Explain steps with shot changes/zoom every 1.5–2s + matching B-roll.",
+                "cta": "Stable closing shot, direct eye contact, minimal gesture, calmer pacing.",
+            }[focus]
+            cam = {
+                "hook": "Movement: subtle push-in, eye focus.",
+                "problem": "Movement: gentle pan to refresh scene.",
+                "solution": "Movement: controlled jump cuts + over-shoulder / hands insert.",
+                "cta": "Movement: locked-off, slight ease-out at the end.",
+            }[focus]
+
+        vo = vo_seed
+        parts.append(
+            f"[{seg_label} {a:02d}-{b:02d}s]\n"
+            f"{base}\n"
+            f"{focus_txt} {cam}\n"
+            f"{vo_label}: {vo}\n"
+        )
+
+    return "\n".join(parts).strip()
+
+
 @app.get("/v1/session")
 def get_session():
-    """
-    UI helper: get (or create) a creator session id.
-    The UI can store creator_id in localStorage; we also set a cookie for convenience.
-    """
-    creator = None
-    cid = _resolve_creator_id(None)
-    if cid:
-        creator = _get_creator(cid)
-
-    created = False
-    if creator is None:
-        creator = _ensure_creator({}, allow_auto_create=True)
-        created = True
-
-    resp = jsonify({
-        "creator_id": creator.get("id"),
-        "created": created,
-        "profile": {
-            "display_name": creator.get("display_name"),
-            "primary_niche": creator.get("primary_niche"),
-            "primary_language": creator.get("primary_language"),
-        },
-    })
-    # Cookie is optional, but it removes the need to keep passing creator_id manually.
-    resp.set_cookie("creator_id", creator.get("id"), max_age=60 * 60 * 24 * 365, samesite="Lax", secure=True)
-    return resp
+    creator_id = (request.args.get("creator_id") or "").strip()
+    if not creator_id:
+        return _json_error("creator_id is required", status=400)
+    db = _db()
+    try:
+        c = _get_creator(db, creator_id)
+        if not c:
+            return _json_error("creator not found", status=404)
+        return jsonify({"creator_id": str(c.id), "profile": {"display_name": c.display_name}})
+    finally:
+        db.close()
 
 
 @app.post("/v1/session")
 def post_session():
-    """
-    Create or update a session.
-    If you pass an existing creator_id (header/body/query/cookie) we update its profile.
-    Otherwise we create a new creator and return its id.
-    """
-    data = request.get_json(silent=True) or {}
-    cid = _resolve_creator_id(data)
-    creator = _get_creator(cid) if cid else None
+    db = _db()
+    try:
+        c = _create_creator(db, display_name="Browser Session")
+        return jsonify({"creator_id": str(c.id), "message": "ok"})
+    finally:
+        db.close()
 
-    if creator is None:
-        creator = _ensure_creator(data, allow_auto_create=True)
-        created = True
-    else:
-        created = False
-        # Optional profile update from UI (kept minimal)
-        updates = {}
-        for k in ("display_name", "primary_niche", "primary_language"):
-            if k in data and isinstance(data[k], str) and data[k].strip():
-                updates[k] = data[k].strip()
-        if updates:
-            _upsert_creator(creator.get("id"), updates)
-            creator = _get_creator(creator.get("id"))
 
-    resp = jsonify({"creator_id": creator.get("id"), "created": created, "status": "ok"})
-    resp.set_cookie("creator_id", creator.get("id"), max_age=60 * 60 * 24 * 365, samesite="Lax", secure=True)
-    return resp
+@app.post("/v1/onboard")
+def onboard():
+    db = _db()
+    try:
+        data = request.get_json(silent=True) or {}
+        try:
+            req = OnboardRequest(**data)
+        except ValidationError as e:
+            return _json_error("invalid payload", status=422, details=json.loads(e.json()))
+
+        c = _create_creator(
+            db,
+            display_name=req.display_name,
+            language=req.language,
+            primary_niche=req.primary_niche,
+            goal=req.goal,
+            tone=req.tone,
+        )
+        c.sub_niches_json = safe_json(req.sub_niches)
+        c.constraints_json = safe_json(req.constraints)
+        c.tiktok_profile_url = req.tiktok_profile_url
+        db.add(c)
+        db.commit()
+        db.refresh(c)
+
+        # Seed DNA
+        genome = genome_svc.ensure_genome(db, c)
+        dna = genome_svc.seed_creator_dna(c, req.top_video_urls, req.weak_video_urls, req.past_scripts)
+        genome.creator_dna_json = safe_json(dna)
+        db.add(genome)
+        db.commit()
+
+        return jsonify({"creator_id": str(c.id), "mode_default": "manual", "message": "onboarded"})
+    finally:
+        db.close()
+
+
+@app.post("/v1/daily-brief")
+def daily_brief():
+    db = _db()
+    try:
+        data = request.get_json(silent=True) or {}
+        try:
+            req = DailyBriefRequest(**data)
+        except ValidationError as e:
+            return _json_error("invalid payload", status=422, details=json.loads(e.json()))
+
+        c = _get_creator(db, req.creator_id)
+        if not c:
+            return _json_error("creator not found", status=404)
+
+        ideas = generator_svc.generate_daily_brief(
+            primary_niche=c.primary_niche,
+            language=c.language,
+            tone=c.tone,
+            competitor_urls=req.competitor_urls,
+            extra_context=req.extra_context or "",
+        )
+        return jsonify({"creator_id": str(c.id), "ideas": ideas})
+    finally:
+        db.close()
+
 
 @app.post("/v1/build-pack")
 def build_pack():
-    data = _require_json()
-
+    db = _db()
     try:
-        creator = _ensure_creator(data, allow_auto_create=True)
-        creator_id = creator.get("id")
-    except Exception:
-        return jsonify({"error": "تعذر إنشاء جلسة المستخدم"}), 400
-    idea_title = data.get("idea_title")
-    angle = data.get("angle")
-    value_promise = data.get("value_promise")
-    preferred_length_sec = int(data.get("preferred_length_sec") or 28)
-    mode = data.get("mode") or "both"
+        data = request.get_json(silent=True) or {}
 
-    if not creator_id:
-        return jsonify({"error": "creator_id مطلوب"}), 400
-    if not idea_title or not angle or not value_promise:
-        return jsonify({"error": "حقول مطلوبة: idea_title, angle, value_promise"}), 400
+        # Compatibility: UI may send mode=manual
+        if isinstance(data, dict) and data.get("mode") == "manual":
+            data = dict(data)
+            data["mode"] = "kit"
 
-    creator = _get_creator(creator_id)
+        # Optional convenience fields (not required by UI today)
+        lang = (data.get("language") or "").strip() or None
+        country = (data.get("audience_country") or data.get("country") or "").strip() or None
+        publish_hour = data.get("publish_hour_local")
 
-    # خيار إنقاذ: لو DB اتصفّر بعد Deploy، اسمح بإنشاء Creator افتراضي
-    if not creator and ALLOW_ANON_BUILD_PACK:
-        creator = {
-            "creator_id": creator_id,
-            "created_at": _utc_now_iso(),
-            "display_name": "Creator",
-            "goal": "followers",
-            "primary_niche": "التسويق الرقمي",
-            "sub_niches_json": _json_dumps([]),
-            "language": "ar",
-            "tone": "educational",
-            "constraints_json": _json_dumps({}),
-            "tiktok_profile_url": None,
-            "mode_default": "manual",
-        }
-        _upsert_creator(creator)
+        try:
+            req = BuildPackRequest(**data)
+        except ValidationError as e:
+            return _json_error("invalid payload", status=422, details=json.loads(e.json()))
 
-    if not creator:
-        return jsonify({"error": "creator_id غير موجود. نفّذ /v1/onboard أولًا."}), 404
+        c = _get_creator(db, req.creator_id)
+        if not c:
+            return _json_error("creator not found", status=404)
 
-    result = _build_pack(creator, idea_title, angle, value_promise, preferred_length_sec, mode)
+        if lang:
+            c.language = lang
+            db.add(c)
+            db.commit()
 
-    with _db() as conn:
-        conn.execute(
-            """
-            INSERT INTO experiments (
-                experiment_id, created_at, creator_id,
-                idea_title, angle, value_promise, preferred_length_sec, mode,
-                result_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                result["experiment_id"],
-                _utc_now_iso(),
-                creator_id,
-                idea_title,
-                angle,
-                value_promise,
-                preferred_length_sec,
-                mode,
-                _json_dumps(result),
-            ),
+        # Build variants A/B/C (heuristic MVP)
+        variants_list = generator_svc.build_variants_for_idea(
+            title=req.idea_title,
+            angle=req.angle,
+            niche=c.primary_niche,
         )
-        conn.commit()
-    resp = jsonify(result)
-    try:
-        if creator_id:
-            resp.set_cookie("creator_id", creator_id, max_age=60 * 60 * 24 * 365, samesite="Lax", secure=True)
-    except Exception:
-        pass
-    return resp
+        variants = {v["key"]: v for v in variants_list}
+        predicted_scores = {k: float((variants.get(k) or {}).get("score") or 0.0) for k in ["A", "B", "C"]}
+
+        # Deterministic blueprint + ready-to-record kit
+        blueprint = artifacts_svc.build_blueprint(req.idea_title, req.angle, req.value_promise, req.preferred_length_sec)
+        best_key = _best_variant(variants)
+        best = variants.get(best_key) or {}
+        kit = artifacts_svc.render_ready_to_record_kit(
+            blueprint=blueprint,
+            selected_hook_text=str(best.get("hook_text") or "").strip(),
+            selected_onscreen_text=str(best.get("onscreen_text") or "").strip(),
+            hooks_map={k: {"hook_text": (variants.get(k) or {}).get("hook_text"), "onscreen_text": (variants.get(k) or {}).get("onscreen_text")} for k in ["A", "B", "C"]},
+            keywords=[w for w in (req.idea_title.split() if req.idea_title else [])[:6]],
+        )
+
+        # Caption upgrade (country/time aware, deterministic)
+        kit["caption"] = _build_caption(
+            lang=c.language,
+            title=req.idea_title,
+            value_promise=req.value_promise,
+            country=country,
+            publish_hour_local=publish_hour if publish_hour is None else int(publish_hour),
+            cta_keyword="خطة" if c.language == "ar" else "PLAN",
+        )
+
+        # Hashtags: prefer trends provider if configured, else keep kit fallback
+        try:
+            provider = get_trends_provider()
+            tr = provider.get_hashtags(
+                creator_id=str(c.id),
+                limit=12,
+                lang=c.language,
+                topic=(req.idea_title or c.primary_niche),
+            )
+            kit["hashtags"] = tr.hashtags
+            kit["hashtags_meta"] = {"source": tr.source, "updated_at": tr.updated_at}
+        except Exception as e:
+            log.warning("trends provider failed: %s", e)
+
+        # VEO3 prompt (server-side, higher quality)
+        kit["veo3_prompt"] = _build_veo3_prompt(kit, lang=c.language)
+
+        # Policy gate
+        decision = evaluate_policy(
+            {
+                "script": kit.get("script_teleprompter"),
+                "caption": kit.get("caption"),
+                "onscreen_text": kit.get("onscreen_text_srt"),
+            },
+            constraints=json.loads(c.constraints_json or "{}"),
+        )
+        if not decision.allowed:
+            kit["policy_blocked"] = True
+            kit["policy_reasons"] = decision.reasons
+            # keep sanitized caption/script
+            kit["script_teleprompter"] = decision.sanitized.get("script", kit.get("script_teleprompter"))
+            kit["caption"] = decision.sanitized.get("caption", kit.get("caption"))
+
+        # Create Experiment row
+        exp = experiments_svc.create_experiment(
+            db,
+            creator=c,
+            idea_title=req.idea_title,
+            blueprint=blueprint,
+            variants={
+                "A": variants.get("A") or {},
+                "B": variants.get("B") or {},
+                "C": variants.get("C") or {},
+            },
+            predicted_scores=predicted_scores,
+        )
+
+        artifacts = []
+        if req.mode in ("kit", "both"):
+            artifacts.append({"type": "ready_to_record_kit", "payload": kit})
+            artifacts.append({"type": "experiment_plan", "payload": artifacts_svc.build_experiment_plan()})
+        if req.mode in ("prompt_pack", "both"):
+            artifacts.append({"type": "prompt_pack", "payload": artifacts_svc.build_prompt_pack(req.idea_title, req.angle, req.value_promise)})
+
+        return jsonify(
+            {
+                "experiment_id": str(exp.id),
+                "artifacts": artifacts,
+                "predicted": {
+                    "scores": predicted_scores,
+                    "best_variant": best_key,
+                    "dominance_band": "+10% to +25%" if max(predicted_scores.values() or [0]) >= 75 else "+0% to +10%",
+                },
+            }
+        )
+    finally:
+        db.close()
+
+
 @app.post("/v1/submit-metrics")
 def submit_metrics():
-    data = _require_json()
-    experiment_id = data.get("experiment_id")
+    db = _db()
     try:
-        creator = _ensure_creator(data, allow_auto_create=True)
-        creator_id = creator.get("id")
-    except Exception:
-        creator_id = None
-    payload = data.get("metrics") or data.get("payload") or data
-    if not experiment_id:
-        return jsonify({"error": "experiment_id مطلوب"}), 400
-    if not creator_id:
-        # Last resort: create a session so metrics can still be recorded.
-        creator = _ensure_creator({}, allow_auto_create=True)
-        creator_id = creator.get("id")
+        data = request.get_json(silent=True) or {}
+        try:
+            req = SubmitMetricsRequest(**data)
+        except ValidationError as e:
+            return _json_error("invalid payload", status=422, details=json.loads(e.json()))
 
-    metric_id = str(uuid.uuid4())
-    with _db() as conn:
-        conn.execute(
-            """
-            INSERT INTO metrics (id, created_at, experiment_id, creator_id, payload_json)
-            VALUES (?, ?, ?, ?, ?)
-            """,
-            (metric_id, _utc_now_iso(), experiment_id, creator_id, _json_dumps(payload)),
+        c = _get_creator(db, req.creator_id)
+        if not c:
+            return _json_error("creator not found", status=404)
+
+        exp = db.get(Experiment, int(req.experiment_id))
+        if not exp or exp.creator_id != c.id:
+            return _json_error("experiment not found", status=404)
+
+        # pydantic already validated the structure
+        point: Dict[str, Any] = json.loads(MetricsPoint(**req.point.model_dump()).model_dump_json())  # type: ignore
+        lift = experiments_svc.add_metrics_point(db, exp, req.variant_key, point)
+
+        # If completed, finalize lift + update genome
+        if exp.status == "completed" and exp.winner:
+            lift2 = experiments_svc.finalize_lift(db, c, exp)
+            genome = genome_svc.ensure_genome(db, c)
+            winner_variant = json.loads(getattr(exp, f"variant_{exp.winner.lower()}_json") or "{}")
+            genome_svc.update_genome_after_experiment(
+                db,
+                genome,
+                winner_variant=winner_variant,
+                lift={"lift_views": lift2.lift_views, "lift_share_rate": lift2.lift_share_rate, "lift_engagement_rate": lift2.lift_engagement_rate},
+            )
+
+        return jsonify(
+            {
+                "experiment_id": str(exp.id),
+                "status": exp.status,
+                "winner": exp.winner,
+                "lift": {
+                    "lift_views": exp.lift_views,
+                    "lift_share_rate": exp.lift_share_rate,
+                    "lift_engagement_rate": exp.lift_engagement_rate,
+                },
+            }
         )
-        conn.commit()
-    resp = jsonify({"status": "ok", "metric_id": metric_id})
-    try:
-        if creator_id:
-            resp.set_cookie("creator_id", creator_id, max_age=60 * 60 * 24 * 365, samesite="Lax", secure=True)
-    except Exception:
-        pass
-    return resp
+    finally:
+        db.close()
+
+
 @app.get("/v1/report/<experiment_id>")
 def report(experiment_id: str):
-    creator_id = _resolve_creator_id(None) or request.args.get("creator_id")
-    if not creator_id:
-        return jsonify({"error": "creator_id مطلوب (query/header/cookie)"}), 400
+    db = _db()
+    try:
+        try:
+            eid = int(experiment_id)
+        except Exception:
+            return _json_error("invalid experiment id", status=400)
 
-    with _db() as conn:
-        exp = conn.execute(
-            "SELECT * FROM experiments WHERE experiment_id = ? AND creator_id = ?",
-            (experiment_id, creator_id),
-        ).fetchone()
-
+        exp = db.get(Experiment, eid)
         if not exp:
-            return jsonify({"error": "experiment_id غير موجود لهذا creator_id"}), 404
+            return _json_error("experiment not found", status=404)
 
-        metrics_rows = conn.execute(
-            "SELECT * FROM metrics WHERE experiment_id = ? AND creator_id = ? ORDER BY created_at ASC",
-            (experiment_id, creator_id),
-        ).fetchall()
+        return jsonify(
+            {
+                "experiment_id": str(exp.id),
+                "creator_id": str(exp.creator_id),
+                "status": exp.status,
+                "winner": exp.winner,
+                "predicted_scores": {
+                    "A": exp.predicted_score_a,
+                    "B": exp.predicted_score_b,
+                    "C": exp.predicted_score_c,
+                },
+                "lift": {
+                    "lift_views": exp.lift_views,
+                    "lift_share_rate": exp.lift_share_rate,
+                    "lift_engagement_rate": exp.lift_engagement_rate,
+                },
+                "proof_artifact": {
+                    "idea_title": exp.idea_title,
+                    "winner": exp.winner,
+                    "score_before": max(exp.predicted_score_a, exp.predicted_score_b, exp.predicted_score_c),
+                    "lift_views": exp.lift_views,
+                },
+            }
+        )
+    finally:
+        db.close()
 
-    result = _json_loads(exp["result_json"])
-    metrics = [{"id": r["id"], "created_at": r["created_at"], "payload": _json_loads(r["payload_json"])} for r in metrics_rows]
 
-    return jsonify(
-        {
-            "experiment_id": experiment_id,
-            "creator_id": creator_id,
-            "created_at": exp["created_at"],
-            "result": result,
-            "metrics": metrics,
-        }
-    )
+# ---- boot ----
+init_db()
 
 
-# For local debugging: python app.py
 if __name__ == "__main__":
-    port = int(os.getenv("PORT", "10000"))
-    app.run(host="0.0.0.0", port=port, debug=True)
-
+    # Local dev only. Render uses gunicorn.
+    app.run(host="0.0.0.0", port=10000, debug=(settings.ENV != "production"))
