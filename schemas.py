@@ -111,3 +111,21 @@ class ReportResponse(BaseModel):
     predicted_scores: dict
     lift: dict
     proof_artifact: dict
+
+# -------------------------------------------------------------------
+# Backward-compatibility aliases (do not remove)
+# بعض الإصدارات من app.py تستورد ManualMetricsRequest
+# بينما schemas القديمة تسميها SubmitMetricsRequest
+# نثبت الاثنين لتفادي كسر النشر مستقبلاً.
+# -------------------------------------------------------------------
+
+try:
+    # Prefer subclass name to keep explicit schema class for docs/typing
+    class ManualMetricsRequest(SubmitMetricsRequest):  # type: ignore[name-defined]
+        pass
+except NameError:
+    # If SubmitMetricsRequest is not defined for any reason, fail clearly
+    raise RuntimeError(
+        "schemas.py is missing SubmitMetricsRequest. "
+        "Either define it or update app.py to match the available schema."
+    )
