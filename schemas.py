@@ -129,3 +129,11 @@ except NameError:
         "schemas.py is missing SubmitMetricsRequest. "
         "Either define it or update app.py to match the available schema."
     )
+
+
+class ManualMetricsRequest(SubmitMetricsRequest):
+    """
+    Backward compatible alias.
+    Some older app.py revisions imported ManualMetricsRequest.
+    """
+    pass
