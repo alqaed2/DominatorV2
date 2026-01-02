@@ -1,162 +1,172 @@
-from typing import Any, Dict, List
+from __future__ import annotations
 
-# Safe tokens (no conflict with f-strings, no {HOOK} leakage)
-HOOK_TEXT_TOKEN = "%%HOOK_TEXT%%"
-HOOK_ONSCREEN_TOKEN = "%%HOOK_ONSCREEN%%"
+from typing import Dict, List
 
 
-def build_blueprint(idea_title: str, angle: str, value_promise: str, video_seconds: int = 28) -> Dict[str, Any]:
-    """
-    Builds a deterministic blueprint using safe tokens.
-    This eliminates the {HOOK} placeholder bug permanently.
-    """
-    idea_title = (idea_title or "").strip()
-    angle = (angle or "").strip()
-    value_promise = (value_promise or "").strip()
-    video_seconds = int(video_seconds or 28)
-
-    caption = f"{idea_title}: {value_promise}\n# {idea_title.split(' ')[0] if idea_title else 'نصائح'}"
-
-    script = (
-        f"{HOOK_TEXT_TOKEN}\n"
-        "معظم الناس يقعوا في خطأ واحد…\n"
-        "الحل في 3 خطوات: (1) هدف واضح، (2) خطوة واحدة اليوم، (3) قياس وتعديل.\n"
-        "اكتب كلمة (خطة) بالتعليقات وسأرسل لك نسخة مختصرة."
-    )
-
-    onscreen_srt = (
-        "1\n00:00:00,000 --> 00:00:02,000\n"
-        f"{HOOK_ONSCREEN_TOKEN}\n\n"
-        "2\n00:00:02,000 --> 00:00:08,000\n"
-        "معظم الناس يقعوا في خطأ واحد…\n\n"
-        "3\n00:00:08,000 --> 00:00:22,000\n"
-        "الحل في 3 خطوات: (1) هدف واضح، (2) خطوة واحدة اليوم، (3) قياس وتعديل.\n\n"
-        "4\n00:00:22,000 --> 00:00:28,000\n"
-        "اكتب (خطة) بالتعليقات وسأرسل لك نسخة مختصرة."
-    )
-
-    timeline = {
-        "video_seconds": video_seconds,
-        "sections": [
-            {
-                "type": "hook",
-                "t_start": 0,
-                "t_end": 2,
-                "text": HOOK_TEXT_TOKEN,
-                "onscreen": HOOK_ONSCREEN_TOKEN,
-            },
-            {
-                "type": "problem",
-                "t_start": 2,
-                "t_end": 8,
-                "text": "معظم الناس يقعوا في خطأ واحد…",
-                "onscreen": "الخطأ الشائع",
-            },
-            {
-                "type": "solution",
-                "t_start": 8,
-                "t_end": 22,
-                "text": "الحل في 3 خطوات: (1) هدف واضح، (2) خطوة واحدة اليوم، (3) قياس وتعديل.",
-                "onscreen": "الحل (3 خطوات)",
-            },
-            {
-                "type": "cta",
-                "t_start": 22,
-                "t_end": 28,
-                "text": "اكتب كلمة (خطة) بالتعليقات وسأرسل لك نسخة مختصرة.",
-                "onscreen": "اكتب (خطة) 👇",
-            },
-        ],
-    }
-
+def build_blueprint(
+    idea_title: str,
+    angle: str,
+    value_promise: str,
+    video_seconds: int = 45,
+    language: str = "ar",
+) -> Dict:
     return {
-        "title": idea_title,
+        "idea_title": idea_title,
         "angle": angle,
         "value_promise": value_promise,
-        "caption": caption,
-        "script": script,
-        "onscreen_srt": onscreen_srt,
-        "timeline": timeline,
+        "video_seconds": video_seconds,
+        "beats": [
+            {"t": 0, "label": "Hook"},
+            {"t": 5, "label": "Context"},
+            {"t": 12, "label": "Point 1"},
+            {"t": 22, "label": "Point 2"},
+            {"t": 32, "label": "Point 3"},
+            {"t": 42, "label": "CTA"},
+        ],
+        "language": language,
     }
 
 
-def render_ready_to_record_kit(
-    blueprint: Dict[str, Any],
-    selected_hook_text: str,
-    selected_onscreen_text: str,
-    hooks_map: Dict[str, Dict[str, str]],
-    keywords: List[str],
-) -> Dict[str, Any]:
-    """
-    Renders a ready-to-record kit with tokens replaced deterministically.
-    """
-    script_final = (blueprint.get("script") or "").replace(HOOK_TEXT_TOKEN, selected_hook_text)
-    srt_final = (blueprint.get("onscreen_srt") or "").replace(HOOK_ONSCREEN_TOKEN, selected_onscreen_text)
-
-    # copy timeline with replacements
-    timeline = blueprint.get("timeline") or {"video_seconds": 28, "sections": []}
-    new_sections = []
-    for s in timeline.get("sections", []):
-        ss = dict(s)
-        if ss.get("text") == HOOK_TEXT_TOKEN:
-            ss["text"] = selected_hook_text
-        if ss.get("onscreen") == HOOK_ONSCREEN_TOKEN:
-            ss["onscreen"] = selected_onscreen_text
-        new_sections.append(ss)
-
-    kit = {
-        "id": str(__import__("uuid").uuid4()),
-        "title": blueprint.get("title", ""),
-        "caption": blueprint.get("caption", ""),
-        "hashtags": ["#التسويق_الرقمي", "#تعلم", "#نصائح"],
-        "keywords": keywords or [],
-        "hooks": hooks_map or {},
-        "script_teleprompter": script_final,
-        "onscreen_text_srt": srt_final,
-        "timeline": {"video_seconds": timeline.get("video_seconds", 28), "sections": new_sections},
-        "shot_list": [
-            "لقطة قريبة للوجه/المتحدث مع إضاءة جيدة.",
-            "B-roll بسيط أثناء ذكر الخطوات.",
-            "لقطة ختام مع CTA على الشاشة.",
-        ],
-        "edit_cues": [
-            "تغيير لقطة/زووم بسيط كل 1.5–2 ثانية.",
-            "أظهر الكلمات المفتاحية على الشاشة.",
-            "اجعل الـHook بصوت قوي + نص كبير.",
-        ],
-    }
-    return kit
-
-
-def build_experiment_plan() -> Dict[str, Any]:
+def render_ready_to_record_kit(blueprint: Dict, language: str = "ar") -> Dict:
+    idea = blueprint.get("idea_title", "")
+    angle = blueprint.get("angle", "")
+    promise = blueprint.get("value_promise", "")
+    if language == "ar":
+        return {
+            "script": f"هوك: {angle}\nالوعد: {promise}\nالمحتوى: 3 نقاط قوية عن {idea}\nCTA: تابعني للمزيد.",
+            "caption": f"{angle} — {promise}",
+            "shotlist": ["لقطة وجه قريبة", "نصوص على الشاشة", "B-roll داعم", "CTA نهائي"],
+        }
     return {
-        "measurement_points": ["T+60m", "T+24h", "T+48h"],
-        "what_to_test": [
-            "Hook A/B/C (أول 1-2 ثانية)",
-            "Length (قصير/متوسط عند الحاجة)",
-            "Caption keywords + On-screen text",
-            "Audio (Trending vs Original إذا كان مناسبًا)",
-        ],
-        "win_function": {
-            "phase_1": ["views_velocity (60-180m)", "shares_per_1k_views"],
-            "phase_2": ["comments_per_1k_views", "engagement_rate", "follow_rate_if_available"],
-        },
-        "next_best_action": "إذا فاز Variant ما: اصنع Part 2 بنفس الزاوية مع تطعيم معلومة جديدة.",
+        "script": f"Hook: {angle}\nPromise: {promise}\nBody: 3 strong points about {idea}\nCTA: Follow for more.",
+        "caption": f"{angle} — {promise}",
+        "shotlist": ["Close face shot", "On-screen text", "Supporting b-roll", "Final CTA"],
     }
 
 
-def build_prompt_pack(idea_title: str, angle: str, value_promise: str) -> Dict[str, Any]:
-    idea_title = (idea_title or "").strip()
-    angle = (angle or "").strip()
-    value_promise = (value_promise or "").strip()
-
+def build_experiment_plan(
+    title: str,
+    niche: str = "",
+    goal: str = "",
+    platforms: List[str] | None = None,
+    days: int = 7,
+    language: str = "ar",
+) -> Dict:
+    platforms = platforms or ["tiktok", "reels", "shorts"]
+    if language == "ar":
+        return {
+            "title": title,
+            "goal": goal or "رفع التفاعل",
+            "days": days,
+            "platforms": platforms,
+            "plan": [
+                {"day": 1, "task": "انشر 2 فيديو بزوايا مختلفة"},
+                {"day": 2, "task": "غيّر الهوك فقط وكرر"},
+                {"day": 3, "task": "اختبر طول 30s vs 45s"},
+                {"day": 4, "task": "اختبر CTA مختلف"},
+                {"day": 5, "task": "ركز على أفضل زاوية"},
+                {"day": 6, "task": "أعد إنتاج الأفضل بجودة أعلى"},
+                {"day": 7, "task": "راجِع النتائج وقرّر التالي"},
+            ],
+        }
     return {
-        "title": idea_title,
+        "title": title,
+        "goal": goal or "Increase engagement",
+        "days": days,
+        "platforms": platforms,
+        "plan": [
+            {"day": 1, "task": "Post 2 videos with different angles"},
+            {"day": 2, "task": "Change only the hook and repeat"},
+            {"day": 3, "task": "Test 30s vs 45s length"},
+            {"day": 4, "task": "Test a different CTA"},
+            {"day": 5, "task": "Double down on best angle"},
+            {"day": 6, "task": "Reproduce best with higher quality"},
+            {"day": 7, "task": "Review results and decide next"},
+        ],
+    }
+
+
+def build_prompt_pack(
+    title: str,
+    style: str = "cinematic",
+    outputs: List[str] | None = None,
+    language: str = "ar",
+) -> Dict:
+    outputs = outputs or ["thumbnail", "b-roll", "caption"]
+    if language == "ar":
+        return {
+            "title": title,
+            "style": style,
+            "outputs": outputs,
+            "prompts": {
+                "thumbnail": f"صمّم ثمنيل {style} بعنوان: {title}",
+                "b-roll": f"اقترح لقطات B-roll {style} تدعم فيديو بعنوان: {title}",
+                "caption": f"اكتب كابشن عربي قوي لفيديو بعنوان: {title}",
+            },
+        }
+    return {
+        "title": title,
+        "style": style,
+        "outputs": outputs,
         "prompts": {
-            "hooks": f"ولّد 3 Hooks مختلفة (A/B/C) عن {idea_title}، كل Hook <= 14 كلمة، مع نص شاشة قصير.",
-            "script": f"اكتب سكربت TikTok (28 ثانية) عن: {idea_title} بزاوية: {angle} وبقيمة: {value_promise}. ابدأ بهوك قوي خلال 1 ثانية.",
-            "editing": "اقترح إرشادات مونتاج سريع: تقطيع، تكبير، نص على الشاشة كل 1-2 ثانية، مع إيقاع عالي.",
-            "visual": "اقترح شكل بصري للـFrame الأول + نص كبير واضح + ألوان متناسقة.",
-            "next_series": f"اقترح 5 أفكار (Part 2/3/4) مبنية على نفس زاوية {angle} لتعزيز سلسلة محتوى.",
+            "thumbnail": f"Design a {style} thumbnail titled: {title}",
+            "b-roll": f"Suggest {style} B-roll shots for a video titled: {title}",
+            "caption": f"Write a strong caption for a video titled: {title}",
         },
     }
+
+
+class ArtifactsService:
+    """Backward-compatible wrapper for code that expects a service class."""
+
+    @staticmethod
+    def build_blueprint(
+        idea_title: str,
+        angle: str,
+        value_promise: str,
+        video_seconds: int = 45,
+        language: str = "ar",
+    ):
+        return build_blueprint(
+            idea_title=idea_title,
+            angle=angle,
+            value_promise=value_promise,
+            video_seconds=video_seconds,
+            language=language,
+        )
+
+    @staticmethod
+    def render_ready_to_record_kit(blueprint: dict, language: str = "ar"):
+        return render_ready_to_record_kit(blueprint=blueprint, language=language)
+
+    @staticmethod
+    def build_experiment_plan(
+        title: str,
+        niche: str = "",
+        goal: str = "",
+        platforms: list[str] | None = None,
+        days: int = 7,
+        language: str = "ar",
+    ):
+        return build_experiment_plan(
+            title=title,
+            niche=niche,
+            goal=goal,
+            platforms=platforms or ["tiktok", "reels", "shorts"],
+            days=days,
+            language=language,
+        )
+
+    @staticmethod
+    def build_prompt_pack(
+        title: str,
+        style: str = "cinematic",
+        outputs: list[str] | None = None,
+        language: str = "ar",
+    ):
+        return build_prompt_pack(
+            title=title,
+            style=style,
+            outputs=outputs or ["thumbnail", "b-roll", "caption"],
+            language=language,
+        )
