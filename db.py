@@ -1,73 +1,50 @@
 import os
 from sqlalchemy import create_engine
-from sqlalchemy.engine.url import make_url
-from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy.orm import scoped_session, sessionmaker
 
 from config import settings
+from models import Base
 
-Base = declarative_base()
 
-def _pick_postgres_driver() -> str:
+def _normalize_db_url(url: str) -> str:
     """
-    Prefer psycopg (v3). Fallback to psycopg2 if present.
-    Fail fast with a clear message if neither is installed.
+    Render/Postgres often provides postgres://... which SQLAlchemy treats as psycopg2 by default.
+    We normalize to postgresql+psycopg://... to use psycopg3 (psycopg[binary]).
     """
-    try:
-        import psycopg  # noqa: F401
-        return "psycopg"
-    except Exception:
-        pass
+    if not url:
+        return url
 
-    try:
-        import psycopg2  # noqa: F401
-        return "psycopg2"
-    except Exception:
-        pass
+    # Render commonly uses postgres://
+    if url.startswith("postgres://"):
+        url = "postgresql://" + url[len("postgres://") :]
 
-    raise RuntimeError(
-        "No Postgres driver installed. Install one of:\n"
-        "- psycopg[binary] (recommended)\n"
-        "- psycopg2-binary"
-    )
+    # If it's a postgres URL without an explicit driver, force psycopg3
+    if url.startswith("postgresql://") and "+psycopg" not in url:
+        url = url.replace("postgresql://", "postgresql+psycopg://", 1)
 
-def _normalize_db_url(raw: str) -> str:
-    if not raw:
-        raise RuntimeError("DATABASE_URL is missing")
+    return url
 
-    # Render may provide postgres:// which SQLAlchemy expects as postgresql://
-    if raw.startswith("postgres://"):
-        raw = raw.replace("postgres://", "postgresql://", 1)
-
-    # SQLite remains supported (dev)
-    if raw.startswith("sqlite"):
-        return raw
-
-    # Postgres: enforce a driver that is actually installed
-    if raw.startswith("postgresql"):
-        driver = _pick_postgres_driver()
-        url = make_url(raw)
-
-        # Force drivername to match installed driver
-        url = url.set(drivername=f"postgresql+{driver}")
-        return str(url)
-
-    return raw
 
 _db_url = _normalize_db_url(settings.DATABASE_URL)
 
-connect_args = {"check_same_thread": False} if _db_url.startswith("sqlite") else {}
+connect_args = {}
+if _db_url.startswith("sqlite"):
+    connect_args = {"check_same_thread": False}
 
 engine = create_engine(
     _db_url,
-    echo=False,
-    future=True,
-    pool_pre_ping=True,
-    pool_recycle=1800,
     connect_args=connect_args,
+    pool_pre_ping=True,
 )
 
-SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False, future=True)
+SessionLocal = scoped_session(
+    sessionmaker(
+        autocommit=False,
+        autoflush=False,
+        bind=engine,
+    )
+)
 
-def init_db():
-    import models  # noqa: F401
+
+def init_db() -> None:
     Base.metadata.create_all(bind=engine)
