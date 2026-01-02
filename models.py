@@ -24,64 +24,29 @@ class Creator(Base):
     tone: Mapped[str] = mapped_column(String(40), default="educational")  # educational|story|funny|mixed
     constraints_json: Mapped[str] = mapped_column(Text, default="{}")
 
-    tiktok_profile_url: Mapped[str | None] = mapped_column(Text, nullable=True)
-
-    baseline_views: Mapped[float] = mapped_column(Float, default=0.0)
-    baseline_engagement_rate: Mapped[float] = mapped_column(Float, default=0.0)
-    baseline_share_rate: Mapped[float] = mapped_column(Float, default=0.0)
-
-    genome = relationship("Genome", back_populates="creator", uselist=False, cascade="all, delete-orphan")
-    experiments = relationship("Experiment", back_populates="creator", cascade="all, delete-orphan")
-
-
-class Genome(Base):
-    __tablename__ = "genomes"
-
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
-    creator_id: Mapped[str] = mapped_column(String(36), ForeignKey("creators.id"), unique=True)
-
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-
-    # JSON blob string with creator DNA (hook archetypes, pacing prefs, vocab, etc.)
-    creator_dna_json: Mapped[str] = mapped_column(Text, default="{}")
-
-    # Learned weights/calibration
-    calibration_json: Mapped[str] = mapped_column(Text, default="{}")
-
-    creator = relationship("Creator", back_populates="genome")
+    experiments = relationship("Experiment", back_populates="creator")
 
 
 class Experiment(Base):
     __tablename__ = "experiments"
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
-    creator_id: Mapped[str] = mapped_column(String(36), ForeignKey("creators.id"))
-
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    status: Mapped[str] = mapped_column(String(30), default="draft")  # draft|running|completed
 
-    idea_title: Mapped[str] = mapped_column(String(200))
-    blueprint_json: Mapped[str] = mapped_column(Text, default="{}")  # content blueprint
+    creator_id: Mapped[str] = mapped_column(String(36), ForeignKey("creators.id"), index=True)
+    idea_title: Mapped[str] = mapped_column(String(240), default="")
+    angle: Mapped[str] = mapped_column(String(240), default="")
+    niche: Mapped[str] = mapped_column(String(120), default="general")
 
-    # Variants (A/B/C)
-    variant_a_json: Mapped[str] = mapped_column(Text, default="{}")
-    variant_b_json: Mapped[str] = mapped_column(Text, default="{}")
-    variant_c_json: Mapped[str] = mapped_column(Text, default="{}")
+    mode: Mapped[str] = mapped_column(String(20), default="kit")  # kit|score|both
+    variants_json: Mapped[str] = mapped_column(Text, default="{}")
+    predicted_scores_json: Mapped[str] = mapped_column(Text, default="{}")
 
-    predicted_score_a: Mapped[float] = mapped_column(Float, default=0.0)
-    predicted_score_b: Mapped[float] = mapped_column(Float, default=0.0)
-    predicted_score_c: Mapped[float] = mapped_column(Float, default=0.0)
-
-    winner: Mapped[str | None] = mapped_column(String(1), nullable=True)  # A|B|C
-
-    # Metrics snapshots stored as JSON string
+    # manual metrics snapshots (T+60m / 24h / 48h), JSON list
     metrics_json: Mapped[str] = mapped_column(Text, default="[]")
 
-    # Lift summary
-    lift_views: Mapped[float] = mapped_column(Float, default=0.0)
-    lift_share_rate: Mapped[float] = mapped_column(Float, default=0.0)
-    lift_engagement_rate: Mapped[float] = mapped_column(Float, default=0.0)
+    is_winner_selected: Mapped[bool] = mapped_column(Boolean, default=False)
+    winner_key: Mapped[str] = mapped_column(String(4), default="")
 
     creator = relationship("Creator", back_populates="experiments")
 
