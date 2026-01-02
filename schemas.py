@@ -1,139 +1,43 @@
+from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
-from typing import Any, Literal
 
 
 class OnboardRequest(BaseModel):
-    display_name: str = Field(default="New Creator")
-    goal: Literal["followers", "sales", "authority"] = "followers"
-    primary_niche: str
-    sub_niches: list[str] = []
-    language: Literal["ar", "en"] = "ar"
-    tone: Literal["educational", "story", "funny", "mixed"] = "educational"
-    constraints: dict[str, Any] = {}
-    tiktok_profile_url: str | None = None
-
-    # Optional: examples for stronger DNA
-    top_video_urls: list[str] = []
-    weak_video_urls: list[str] = []
-    past_scripts: list[str] = []
-
-
-class OnboardResponse(BaseModel):
-    creator_id: str
-    mode_default: Literal["manual"] = "manual"
-    message: str
+    project_name: str = Field(..., min_length=1)
+    niche: str = Field(..., min_length=1)
+    audience: str = Field(..., min_length=1)
+    goal: str = Field(..., min_length=1)
+    platforms: List[str] = Field(default_factory=lambda: ["tiktok", "reels", "shorts"])
+    language: str = Field(default="ar")
 
 
 class DailyBriefRequest(BaseModel):
-    creator_id: str
-    competitor_urls: list[str] = []
-    extra_context: str | None = None
-
-
-class HookVariant(BaseModel):
-    key: Literal["A", "B", "C"]
-    hook_text: str
-    onscreen_text: str
-    score: float
-    why: list[str]
-    minimum_fix: str
-
-
-class IdeaBrief(BaseModel):
-    title: str
-    angle: str
-    value_promise: str
-    variants: list[HookVariant]
-
-
-class DailyBriefResponse(BaseModel):
-    creator_id: str
-    ideas: list[IdeaBrief]
+    idea: str = Field(..., min_length=1)
+    language: str = Field(default="ar")
 
 
 class BuildPackRequest(BaseModel):
-    creator_id: str
-    idea_title: str
-    angle: str
-    value_promise: str
-    preferred_length_sec: int = 28
-    # Optional context knobs (UI may omit; API can use them for smarter outputs)
-    topic: str | None = None
-    language: str | None = None
-    audience_country: str | None = None
-    publish_hour_local: int | None = None
-    timezone_offset_min: int | None = None
-
-    # Compatibility: older UIs used "manual" to mean "kit".
-    mode: Literal["kit", "prompt_pack", "both", "manual"] = "kit"
-
-
-class Artifact(BaseModel):
-    type: Literal["ready_to_record_kit", "prompt_pack", "experiment_plan"]
-    payload: dict
-
-
-class BuildPackResponse(BaseModel):
-    experiment_id: str
-    artifacts: list[Artifact]
-    predicted: dict
-
-
-class MetricsPoint(BaseModel):
-    t_label: Literal["T+60m", "T+24h", "T+48h"]
-    views: int
-    likes: int
-    comments: int
-    shares: int
-    followers_gained: int | None = None
-    profile_visits: int | None = None
+    title: str = Field(..., min_length=1)
+    niche: str = Field(default="")
+    audience: str = Field(default="")
+    language: str = Field(default="ar")
 
 
 class SubmitMetricsRequest(BaseModel):
-    creator_id: str
-    experiment_id: str
-    variant_key: Literal["A", "B", "C"]
-    point: MetricsPoint
-
-
-class SubmitMetricsResponse(BaseModel):
-    experiment_id: str
-    status: str
-    winner: str | None
-    lift: dict
-
-
-class ReportResponse(BaseModel):
-    experiment_id: str
-    creator_id: str
-    status: str
-    winner: str | None
-    predicted_scores: dict
-    lift: dict
-    proof_artifact: dict
-
-# -------------------------------------------------------------------
-# Backward-compatibility aliases (do not remove)
-# بعض الإصدارات من app.py تستورد ManualMetricsRequest
-# بينما schemas القديمة تسميها SubmitMetricsRequest
-# نثبت الاثنين لتفادي كسر النشر مستقبلاً.
-# -------------------------------------------------------------------
-
-try:
-    # Prefer subclass name to keep explicit schema class for docs/typing
-    class ManualMetricsRequest(SubmitMetricsRequest):  # type: ignore[name-defined]
-        pass
-except NameError:
-    # If SubmitMetricsRequest is not defined for any reason, fail clearly
-    raise RuntimeError(
-        "schemas.py is missing SubmitMetricsRequest. "
-        "Either define it or update app.py to match the available schema."
-    )
+    session_id: str = Field(..., min_length=8)
+    platform: str = Field(..., min_length=1)
+    content_id: str = Field(..., min_length=1)
+    metrics: Dict[str, Any] = Field(default_factory=dict)
+    ts: Optional[str] = None
 
 
 class ManualMetricsRequest(SubmitMetricsRequest):
-    """
-    Backward compatible alias.
-    Some older app.py revisions imported ManualMetricsRequest.
-    """
+    """Backward-compatible alias for older clients."""
     pass
+
+
+class MetricsPoint(BaseModel):
+    ts: str
+    platform: str
+    content_id: str
+    metrics: Dict[str, Any]
