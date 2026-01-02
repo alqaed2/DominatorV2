@@ -501,10 +501,15 @@ SFX: gentle outro whoosh, end clean.`
       return null;
     }
 
-    // Minimal payload (hide advanced fields; system handles defaults)
+    // Minimal payload (hide advanced fields; system handles sane defaults)
+    // We still pass language + publish hour to improve caption and VEO3 prompts.
     const payload = {
       creator_id: creatorId,
       idea_title: ideaTitle,
+      topic: topic,
+      language: lang,
+      publish_hour_local: new Date().getHours(),
+      timezone_offset_min: new Date().getTimezoneOffset(),
       angle: "Saveable steps list",
       value_promise: (lang === "ar") ? "خطة بسيطة: نفّذ، قِس، عدّل." : "Simple plan: execute, measure, iterate.",
       preferred_length_sec: 28,
@@ -542,7 +547,7 @@ SFX: gentle outro whoosh, end clean.`
 
       if(kit){
         // VEO3 prompt card
-        const veo = buildVeoPromptSegments(kit, $("contentLang").value);
+        const veo = kit.veo3_prompt || buildVeoPromptSegments(kit, $("contentLang").value);
         results.appendChild(card(
           t("veoprompt"),
           preBlock(veo),
