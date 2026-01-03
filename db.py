@@ -1,4 +1,3 @@
-import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import scoped_session, sessionmaker
 
@@ -7,18 +6,12 @@ from models import Base
 
 
 def _normalize_db_url(url: str) -> str:
-    """
-    Render/Postgres often provides postgres://... which SQLAlchemy treats as psycopg2 by default.
-    We normalize to postgresql+psycopg://... to use psycopg3 (psycopg[binary]).
-    """
     if not url:
         return url
 
-    # Render commonly uses postgres://
     if url.startswith("postgres://"):
         url = "postgresql://" + url[len("postgres://") :]
 
-    # If it's a postgres URL without an explicit driver, force psycopg3
     if url.startswith("postgresql://") and "+psycopg" not in url:
         url = url.replace("postgresql://", "postgresql+psycopg://", 1)
 
