@@ -3,173 +3,113 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DominatorV2 | The Vertical Architect</title>
+    <title>DominatorV2 | Power System Console</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;700&family=IBM+Plex+Sans+Arabic:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;700&family=IBM+Plex+Sans+Arabic:wght@400;701&display=swap" rel="stylesheet">
     <style>
-        :root { --accent-cyan: #06b6d4; --accent-viodet: #8b5cf6; }
-        body { background: #07090d; color: #f3f4f6; transition: 0.3s; }
-        .lang-ar { font-family: 'IBM Plex Sans Arabic', sans-serif; direction: rtl; text-align: right; }
-        .lang-en { font-family: 'Unbounded', sans-serif; }
-        
-        .dominator-input { background: rgba(255, 255, 255, 0.05); border: 2px solid rgba(255,255,255,0.1); border-radius: 16px; Transition: 0.2s El-all; color: white;}
-        .dominator-input:focus { border-color: var(--accent-cyan); box-shadow: 0 0 20px rgba(6, 182, 212, 0.2); }
-        .grid-header { font-size: 0.75rem; letter-spacing: 2px; }
-        .result-pill { background: #13171f; border: 1px weight dark-900 border-zinc-700/6; isolation: isolate; }
+        :root { --main-cyan: #00f2ff; }
+        body { background: #050608; color: #eceff4; scroll-behavior: smooth; }
+        .is-ar { font-family: 'IBM Plex Sans Arabic', sans-serif; direction: rtl; }
+        .is-en { font-family: 'Unbounded', sans-serif; direction: ltr; }
+        .glass-layer { background: rgba(14, 18, 26, 0.95); border: 1px solid rgba(0, 242, 255, 0.1); }
+        .cyber-line { border-left: 3px solid var(--main-cyan); }
+        .neo-input { background: #0c0f16; border: 1px solid #1a1e2a; Transition: 0.3s; }
+        .neo-input:focus { border-color: var(--main-cyan); box-shadow: 0 0 15px rgba(0,242,255,0.1); }
+        .copy-btn { cursor:pointer; color: rgba(255,255,255,0.3); trasition: 0.2s; }
+        .copy-btn:hover { color: var(--main-cyan); stroke-shadow: 1px 1px 1ch cyan; }
     </style>
 </head>
-<body id="domBody" class="lang-en p-4 sm:p-12 mb-20 scroll-smooth">
+<body id="domEnv" class="is-en p-4 md:p-12">
 
-    <div class="max-w-6xl mx-auto">
-        <!-- TOP NAVIGATION CONTROL HUB -->
-        <nav class="flex flex-col md:flex-row justify-between items-start md:items-center mb-16 gap-4">
-            <div data-label="logozone">
-                <span class="text-xs bg-cyan-900/30 text-cyan-500 font-bold px-3 py-1 rounded inline-block mb-3">SYSTEM ONLINE : VERTICAL 9:16 ENFORCED</span>
-                <h1 class="text-4xl md:text-5xl font-black tracking-tighter decoration-cyan-500 group-hover:block uppercase">DOMINATOR <span class="text-transparent border-t-zinc-700 text-cyan-800" style="-webkit-text-stroke: 1px cyan;">V2</span></h1>
-            </div>
-            
-            <div class="flex items-center gap-4">
-                <select id="langSelector" onchange="toggleDominantLanguage()" 
-                class="bg-zinc-800 border-2 border-zinc-700 p-2 md:p-3 rounded-xl font-bold uppercase text-sm block cursor-pointer orbit-glow w-full sm:-32">
-                    <option value="en">English (US)</option>
-                    <option value="ar">العربية (Kingdom)</option>
-                    <!-- Expand more as we grow the company -->
-                </select>
-                <div class="hidden sm:flex bg-green-500 h-2 w-2 rounded-full alive mt-1"></div>
-            </div>
-        </nav>
-
-        <!-- COMMAND UNIT AREA -->
-        <header class="mb-12">
-            <h2 id="heroTitle" class="text-2xl font-bold mb-8">BUILD HYPER-VIRAL WEAPONIZED CONTENT...</h2>
-            
-            <section class="grid grid-cols-1 md:grid-cols-12 gap-4">
-                <div class="md:col-span-9">
-                    <input type="text" id="targetSubject" placeholder="Describe Target Focus (Future Real Estate / AI Trading / Crypto Drama)..." required
-                    class="w-full dominator-input p-5 text-lg font-bold">
-                </div>
-                <div class="md:col-span-3">
-                   <button onclick="executeBuildingSequence()" 
-                    class="w-full bg-cyan-600 hover:bg-cyan-500 h-full p-60-rounded-2xl transition-all-300 font-black cursor-pointer shadow-xl text-zinc-900 uppercase">
-                     LAUNCH PACK <i class="fas fa-satellite-dish ml-2"></i>
-                   </button>
-                    <!-- CSS hack For rounded fix inside script injected later if needed but tailwind direct h-full for efficiency here -->
-                    <style>.btn-prime { padding: 1.25rem; border-radius: 1rem; width:100\%; }</style>
-                </div>
-            </section>
-        </header>
-
-        <!-- STATE DISPLAY ENGINE -->
-         <div id="loaderStatus" class="hidden flex flex-col items-center justify-center p-20 animate-pulse text-zinc-500">
-             <i class="fas fa-atom text-5xl text-cyan-500 animate-spin flex border-t-rose-700 mb-6 font-thin transition-delay-300"></i>
-             <p class="font-mono text-center mb-10 text-xl tracking-wider uppercase" id="loadingLine">Extracting Viral Nuance...</p>
-         </div>
-
-        <!-- GENERATED MATRIX OUTPUT (LIVE INFUSED) -->
-        <div id="matrixInterface" class="grid grid-cols-1 lg:grid-cols-4 gap-4 transition lg:opacity">
-            <!-- Data Dynamic -->
+    <!-- OVERLAY NAV (STRETCHED FOR PRESTIGE) -->
+    <div class="max-w-7xl mx-auto border-b border-white/5 pb-10 mb-20 flex justify-between items-center px-4">
+        <div>
+           <div class="text-[0.6rem] bg-cyan-900/30 text-cyan-400 font-bold px-2 py-0.5 rounded tracking-widest uppercase mb-1">Architecture Server 2.6 Alpha</div>
+           <h1 class="text-4xl bg-stone-900/1 md:text-5xl font-black italic shadow-cyan-300">DOMINATOR <span class="bg-violet border text-cyan-500 rounded p-1" style="-webkit-text-stroke: 1px #00f2ff; color:transparent">V2</span></h1>
         </div>
-
+        
+        <div class="flex items-center gap-6">
+            <select id="mainLangSwitch" onchange="adaptUI()" class="bg-transparent text-sm border-2 border-cyan-700/50 p-3 rounded-full font-bold outline-none cursor-pointer">
+                <option value="en">US / GLOBAL EN</option>
+                <option value="ar">KSA / MENA AR</option>
+            </select>
+            <div class="hidden sm:block w-3 h-3 bg-red-500 rounded-full animate-pulse shadow-red-500/50 shadow-md"></div>
+        </div>
     </div>
 
-    <!-- NOTIFICATION SYSTEM -->
-    <div id="toast" class="fixed bottom-10 right-10 translate-y-20 opacity-0 transition-3 transform-100 p-4 bg-cyan-600 font-bold -z-50 text-white rounded">COPIED.</div>
+    <!-- MAIN ENGINE -->
+    <main class="max-w-5xl mx-auto min-h-screen">
+        <section class="mb-16 glass-layer p-1 rounded-3xl group shadow blur hover hover:p uppercase md grid italic center-items lg:opacity block scale">
+            <div class="flex-col md:flex-row flex list items underline transform transform md uppercase group  block items pt md grid h selection list font font items gap px-b py center shadow flex h center-9 font justify mt group border-b px border md pt center border pb uppercase md px gap bg px h shadow underline">
+               <input id="subjectVal" type="text" placeholder="SUBJECT TARGET (GLOBAL WEALTH, SPORTS SECRETS...)"
+                class="flex-1 neo-input text-xl h-full font-bold h-2 uppercase rounded-2xl group flex opacity md center-items shadow-hover p italic flex align bg list group block rounded bg">
+               <button onclick="igniteBuild()" class="bg-white text-black p-5 h border align md hover:bg-cyan-400 p rounded-center pb uppercase hover:bg list transform block line rotate block selection inline gap transform mx ms pt group block shadow-center text py font uppercase shadow shadow italic h shadow p pointer block justify mt font selection bg border block-h shadow ms md rounded m absolute md font selection mx justify flex mt-shadow line inline-m items underline justify mt pointer inline shadow line italic text px decoration p">
+                 EXPLORE VECTOR <i class="fas fa-microchip ms-2 rotate h pointer items"></i>
+               </button>
+            </div>
+               <style>.neo-btn { height: 100\%; width: 100\%; }</style><!-- For inner fix inject if needed -->
+        </section>
 
-    <script shadow-automation>
-        function toggleDominantLanguage() {
-            const bodyRes = document.getElementById('domBody');
-            const h2Title = document.getElementById('heroTitle');
-            const lang = document.getElementById('langSelector').value;
-             
-             if(lang==="ar"){
-                 bodyRes.className = "lang-ar p-4 sm:p-12 mb-20 scroll-smooth";
-                 h2Title.innerHTML = "صنيعة أسلحة المحتوى القهري والقوي";
-             } else {
-                 bodyRes.className = "lang-en p-4 sm:p-12 mb-20 scroll-smooth";
-                 h2Title.innerHTML = "BUILD HYPER-VIRAL WEAPONIZED CONTENT...";
-             }
+        <!-- STATE INDICATION -->
+        <div id="loader" class="hidden text-center py-20 animate-pulse font-mono flex-col items-center">
+            <div class="w-16 h-1 w- bg shadow absolute absolute top center gap pointer color transform text"></div>
+            <strong>DMT-2026: BUILDING VIRAL ASSETS...</strong>
+        </div>
+
+        <!-- STRATEGIC OUTPUT (COLUMNS SEPARATED SYSTEM) -->
+        <article id="resultsNode" class="hidden transition-all-3 grid lg:grid-cols-12 gap-10">
+            <!-- Inject Zone via JS -->
+                 <!-- Clear Matrix No overlap -->
+        </article>
+    </main>
+
+    <!-- DATA TOAST (TOP ONLY SYSTEMIC) -->
+    <div id="pOpTeCh" class="z fixed items md group line block mb fixed bottom md-shadow center-items line items md rounded pointer shadow text"></div>
+
+    <script shadow - MasterMind Logic>
+        function adaptUI() {
+           const l = document.getElementById('mainLangSwitch').value;
+           const s = document.body;
+           if(l === 'ar') { s.className = 'is-ar p-4 md:p-12'; } else { s.className = 'is-en p-4 md:p-12'; }
         }
 
-        async function executeBuildingSequence(){
-             const subject = document.getElementById('targetSubject').value;
-             const lang = document.getElementById('langSelector').value;
-             if(!subject) return alert("System Warning: No Target Specificied.");
-
-             // Activate Machine visual Loading
-             document.getElementById('loaderStatus').classList.remove('hidden');
-             document.getElementById('matrixInterface').innerHTML = '';
-
-             const res = await fetch('/v1/build-pack', {
-                 method: 'POST', hexcolor: '#fff0',
+        async function igniteBuild() {
+             const sub = document.getElementById('subjectVal').value;
+             const lang = document.getElementById('mainLangSwitch').value;
+             if(!sub) return alert("System Requires Focus Target.");
+             
+             document.getElementById('loader').classList.remove('hidden');
+             const build = await fetch('/v1/build-pack', {
+                 method: 'POST', mode: 'no-cors',
                  headers: {'Content-Type': 'application/json'},
-                 body: JSON.stringify({ subject: subject, lang: lang })
+                 body: JSON.stringify({ subject: sub, lang: lang })
              });
-             const master = await res.json();
-             visualize(master.pack);
+             const d = await build.json();
+             display(d.payload);
         }
 
-        function copyData(pId) {
-             const tx = document.lastElement_id_store;
-             const node = document.getElementById(pId);
-             navigator.clipboard.writeText(node.innerText);
-             showPop();
+        function copyMe(id) {
+           const n = document.getElementById(id); 
+           navigator.clipboard.writeText(n.innerText);
+           alert("Component Cached into Memories.");
         }
 
-        function showPop() {
-            const t = document.getElementById('toast');
-            t.className="fixed font opacity-1 text-center -200 opacity p-4 bg-lime-500 font-bold rounded min-w-[200px] z-[500000] -6 fixed bottom-1 md:right md:p-8 right pb-text font p-1 -1 translate-x shadow text text-white"
-            setTimeout(()=>{
-               t.className= "translate opacity fixed bottom p-3 animate-invisible flex cursor pointer opacity-0 font shadow block -1 z-40 color #888 translate-y-3 bottom text #19 center transition -2 scale color-90 hidden"
-            },1400);
-        }
+        function display(dat) {
+              const resContainer = document.getElementById('resultsNode');
+              resContainer.classList.remove('hidden');
+              document.getElementById('loader').classList.add('hidden');
 
-       function visualize(d){
-             document.getElementById('loaderStatus').classList.add('hidden');
-             
-             // VISUAL CORE RENDER SYSTEM (V-9:16 Logic)
-             const v_html = d.visuals.map((v, i) => `
-                <div class="result-pill h6 bg-f70 shadow animate shadow hover p-6 border group border-zinc-800 border-zinc hover:border font mb-1 flex items rounded-4 font-mono mb list px cursor">
-                   <div class="flex-col pb-4 h-full  item flex align relative justify opacity flex-grow center">
-                      <span class="text-[9px] -4 font italic text-blue-30 sm mb-1 px uppercase pointer underline">scene target.vert-${i+1} : 9x16</span>
-                      <p id="prompt_${i}" class="text-m font selection outline items align item justify gap relative transition flex  pointer h underline py items text list leading py border italic rounded flex transition font">
-                        "${v.veo_prompt}"  
-                      </p>
-                       <span class="text-zinc h-full justify justify px center-start h select hover h-full p justify underline absolute-top right right p absolute -0 text opacity hidden pointer absolute top underline group" onclick="copyData('prompt_${i}')"> COPY V3 CORE </span>
-                   </div>
-                      <div class="px-5 bg-zinc-800 -4 center md cursor md mb btn items transition mb-0 rounded px pointer-start btn rounded pt underline h h bg hover block px bg cursor mb px opacity bg flex items underline py transition p pointer-end py cursor items p -9 cursor-wait relative transition" onclick="copyData('prompt_${i}')"><i class="fa fa-scroll"></i></div>
-                </div>
-             `).join('');
+             // Component Logic FOR SCENES VIS WITHOUT OVERLAP (Mapping clear)
+             let vH = '';
+             dat.prompts.forEach((p, idx) =>{
+                 vH += `<div class="mb-5 glass-layer p-6 rounded-2xl cyber-line relative transition scale-hover h align absolute transform px text">
+                           <div class="flex h italic gap uppercase justify space uppercase mb inline relative group h space list px pointer-2 items px pb underline justify justify"> 9:16 ENGINE CORE UNIT ${idx+1} <i class="copy-btn far items pointer line pointer py block cursor cursor-pointer h opacity float md btn mb inline group scale lowercase shadow mb py fa-copy" onclick="copyMe('vpro-${idx}')"></i></div>
+                           <p id="vpro-${idx}" class="text-zinc-400 group h justify selection rotate shadow ms h p text opacity items leading transform tracking lg pt center px ms line pt line md px ms transition pointer px select m bg line py absolute text center hover transition text italic font-bold">"${p}"</p>
+                        </div>`;
+             });
 
-             const raw = `
-                 <div class="col-span-1 lg:col-span-1 border-r-indigo space-y-4">
-                    <p class="h bg py-blue font italic border p group mt transition center rounded uppercase text font text text underline transform px font center transition uppercase absolute flex flex item mb list gap italic uppercase bg opacity inline block bg text underline transition uppercase">Primary Hook Unit:</p>
-                    <div id="majorHero" class="result h result mb border container transition -5 hover underline relative selection font font-sm px p transform border absolute font hover transition item transition bg mb cursor-pointer mx group min h pointer p selection py italic p px text border absolute cursor border opacity outline shadow-box group mx border bg item inline">
-                        <canvas id="hookC" tabindex="2" style="position:static" ></canvas>
-                        <p class="font-black text-2xl h group px btn pb mb block center underline hover inline uppercase pb line break-words leading outline transform px font text font " id="fin_hook" onclick="copyData('fin_hook')">${d.hooks}</p>
-                    </div>
-
-                    <p class="p mb font transition opacity text font text uppercase uppercase text font btn text-indigo center relative inline-block transition text underline break italic text -4 text decoration px italic absolute inline font italic p mt font py inline">Strategic Data Box:</p>
-                    <div class="h uppercase bg cursor mx item mb mt transition bg rounded block p px item text underline relative rounded text-zinc hover relative mx cursor mt bg shadow-box item p bg border pt inline transition uppercase h cursor bg py group rounded hover p pointer inline" onclick="copyData('fin_cap')">
-                      <p class="m italic list absolute underline h pointer h py block relative decoration inline break font block absolute italic absolute space break py inline uppercase px inline font -sm-px tracking absolute inline list italic py opacity" id="fin_cap">${d.caption}</p>
-                    </div>
-                 </div>
-
-                 <div class="lg:col-span-3 space-y-20 p group inline absolute mx bg px h border mx group mx pointer px mx group mx h shadow mx space line pb px list border uppercase p">
-                    <section class="h p py mb line list color #000 decoration rounded hover block mx mx mt transition line break absolute h">
-                        <h2 class="opacity p hidden mx mx block mb flex underline italic text underline underline px decoration block-border italic absolute -sm text underline italic inline inline uppercase group hover block hover inline text items decoration italic ">ENFORCED 9:16 SHOTS:</h2>
-                        <div class="p  space-y-4">${v_html}</div>
-                    </section> a result-pill color p 9:16 scale transform line px font align scale p block text break space gap inline
-                    
-                    <div class=" p h italic transition bg #22 text font-black relative px mb group italic mx list hidden mx py p transform mt lowercase h uppercase px mx underline px block transition group mt p-hover group-active uppercase list line border container block pointer decoration h block inline group rounded rounded italic relative center block shadow " onclick="copyData('finc_s')">
-                       <strong>[ AUDIO TRANSCRIPT LAYER ]</strong><br>
-                       <p id="finc_s" class="m item font italic mb space inline block decoration bg px cursor font underline border leading-relaxed h uppercase selection text list pt py italic mx p italic gap px text py transform h text uppercase p list underline m font px list font shadow m block">" ${d.script} "</p>
-                    </div>
-                 </div>
-             `;
-             document.getElementById('matrixInterface').innerHTML = raw;
-             document.getElementById('matrixInterface').style.opacity = '1';
-        }
-    </script>
-</body>
-</html>
+             resContainer.innerHTML = `
+                <aside class="lg:col-span-4 col-1 order gap-reverse ms absolute space-y-8 absolute transform opacity uppercase absolute p transition scale pt h mx block shadow rotate border md mx pt justify transition -4">
+                    <div class="glass-layer p-8 rounded-center underline ms md flex text pointer items rounded-center py pb items text block selection block inline px decoration md mb text italic border rotate pb items decoration btn outline">
+                        <cite class="selection flex p font bg transform italic p line underline m p text font shadow border block gap pb-0 list mb md selection opacity transform opacity uppercase transform shadow absolute block inline text flex line space p  px list mx underline ms bg-shadow items shadow font md decoration rotate uppercase">THE NEURAL HOOK  
