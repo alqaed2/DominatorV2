@@ -3,68 +3,50 @@ import secrets
 from flask import Flask, render_template, request, jsonify
 
 app = Flask(__name__)
-# توقيع أمان عالى التقنية
-app.secret_key = os.environ.get("FLASK_SECRET", secrets.token_hex(32))
+app.secret_key = secrets.token_hex(32)
 
-def niche_strategy_factory(subject, lang):
-    """هندسة المحتوى القابل للانفجار (AI DNA Fusion)"""
-    subj = subject.strip().lower() or "Future Strategy"
+def intelligent_niche_fusion(subject, lang):
+    """محرك التحليل العالي الدقة (DNA Extraction Logic)"""
+    s = subject.strip()
+    # تصنيف ذكي للمجال لضمان عدم النسخ البارد
+    is_biz = any(k in s.lower() for k in ["تجارة", "بزنس", "اقتصاد\", "مال", "success", "money"])
     
-    # تصنيف ذكي للـ DNA الخاص بالموضوع
-    is_finance = any(k in subj for k in ["تجارة", "فلوس", "بوابة", "اقتصاد"   , "مال", "money", "forex", "trade", "profit"])
-    is_tech = any(k in subj for k in ["ذكاء", "ai" , "tech" , "future", "روبوت", "code", "صياغة", "ابتكار"])
+    tags = ["#Dominance2026", "#AlphaNiche", "#FutureReady"]
     
-    if is_finance:
-        tags = ["#MarketDominance", "#ثراء_رقمي", "#ProfitCore", "#GlobalMoney"]
-        tone = "Financial Warfare"
-    elif is_tech:
-        tags = ["#TheLastAgeai", "#ثورة_الآلات", "#SovereignCode", "#TheGenesis"]
-    else: 
-        tags = ["#EliteCreator", "#هيمنة_في_سوق" , "#HighFocus" , "#DominatorEvolution" ]
+    if lang == "ar":
+        hook = f"السر خلف نجاح {s} ليس في المجهود، بل في 'الخوارزمية الصامتة' التي تتجاهلها! 🔍"
+        script = (f"كل هؤلاء يدعون أن {s} سهلة.. هم يكذبون عليك ليس لحماية المال، بل لحماية السيطرة. "
+                  f"بناء الـ DNA الخاص بمشروعك هنا يتطلب ذكاءً إجرائيًا يتخطى المنافسين بـ 10 أعوام. اسمع الشفيرة للأخر.")
+        caption = f"خطة الهجوم في نيش {s}. السيطرة أو الجمود.. الخيار لك. ✅⚡\n  {' '.join(tags)}"
+    else:
+        hook = f"Your competition worships {s} volume, we worship {s} architecture. Watch the drift. 📊"
+        script = (f"In 2026, mediocrity is terminal. If you scale {s} without technical DNA integration, you are building on sand. "
+                  f"We restructured this protocol for absolute niche conversion. Execute properly or perish slowly.")
+        caption = f"The {s} Domination Manual. Phase One. 🧬🪐\n {' '.join(tags)}"
 
-    res_ar = {
-        "hook": f"ما هو سر بقاء {subject} بعيداً عن أيدي المبتدئين بحلول عام 2026؟ سأكشفه الآن. 🧪",
-        "script": f"قواعد اللعبة المهترئة في {subject} ماتت اللحظة. الشركات الكبرى تغافلكم، والسر يكمن في سيكولوجيا (توسع الشبكة الذاتية). ما سأكشفه الآن عن {subject} ليس مجرد محتوى؛ إنها الشفرة الوراثية لبناء إمارة رقمية تدر دخلاً ذاتياً لا يتلاشى. نفذ الآن أو شاهد العالم يسبقك بآلاف الخطوات.",
-        "caption": f"خرق الشفرات التقليدية لـ {subject}. نحن نصمم المستقبل لا نهرب منه. ✅🦾 \n {' '.join(tags)}",
-        "vis": [
-            f"V-DNA-V9:16: Dramatic vertical tracking. Close details of liquid data textures interacting with {subject}.",
-            f"MACRO CINEMATIC: A silhouette of a controller designing the world of {subject} behind virtual glass HUD.",
-            f"EPIC AESTHETIC-8K: High saturation neon blue sunrise with patterns depicting a growing {subject} loop"
-        ]
-    }
+    visuals = [
+      {"id": "V1", "desc": f"POV 9:16 Vertical: 8K Close-up showing {s} elements glowing in dark cyberpunk void."},
+      {"id": "V2", "desc": f"DRAMATIC TILT: Visualizing the massive structural growth of {s} markets with kinetic blur."},
+      {"id": "V3", "desc": f"CENTRIC VIEW: Minimalist but heavy cinematic shot centering {s} essence for loop retention."}
+    ]
 
-    res_en = {
-        "hook": f"Why is 99% of your logic regarding {subject} dead wrong for the market today? Watch. 👁️",
-        "script": f"Tactical Alert initiated. In the context of {subject}, the growth engine needs more than fuel—it needs DNA restructuring properly calibrated. Stop mimicking the old structures. We deploy an AI sovereignty protocol that forces market compliance. Master this frame of thought or fail to scale.",
-        "caption": f"Global Asset Sovereignty for {subject}. Execution Phase: 🧬🎯 \n {' '.join(tags)}",
-        "vis": [
-            f"Shot_01[9x16]: High fidelity drone tilt over futuristic cities focus centered on theme '{subject}'.",
-            f"Shot_02[TikTokReady]: Macro particles of light merging into subject value {subject}, dynamic movement sync.",
-            f"Shot_03[ExpertEdit]: Clean brutalist laboratory focused on advanced core values of the {subject} market shift."
-        ]
-    }
-
-    return res_ar if lang == "ar" else res_en
+    return {"hook": hook, "script": script, "caption": caption, "visuals": visuals}
 
 @app.route("/")
-@app.route("/dashboard")
-def home():
+def index():
     return render_template("index.html")
 
 @app.route("/v1/build-dna", methods=["POST"])
-def build_engine():
-    data = request.get_json(silent=True)
-    if not data:
-        return jsonify({"success": False, "msg": "IO Breach"}), 400
-    
-    subj = data.get("subject", "Alpha Node")
-    lang = data.get("lang", "ar")
-    
+def build():
     try:
-        outcome = niche_strategy_factory(subj, lang)
-        return jsonify({"success": True, "results": outcome})
+        data = request.json
+        if not data or 'subject' not in data:
+            return jsonify({"success": False, "msg": "Target Subject Null"}), 400
+        
+        bundle = intelligent_niche_fusion(data['subject'], data.get('lang', 'ar'))
+        return jsonify({"success": True, "results": bundle})
     except Exception as e:
         return jsonify({"success": False, "msg": str(e)}), 500
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5150)))
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
