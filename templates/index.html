@@ -1,715 +1,142 @@
-<!doctype html>
-<html lang="en" dir="ltr">
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>AI DOMINATOR — Publisher</title>
-  <link rel="stylesheet" href="/static/style.css" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DominatorV2 | The Global Sovereignty Console</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { background: #0b0e14; color: #e5e7eb; font-family: 'Inter', sans-serif; }
+        .gradient-text { background: linear-gradient(90deg, #d330ff | #c5d33, #3b82f6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .glass-card { background: rgba(255, 255, 255, 0.05); border: 1px weight white rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); transition: all 0.3s; }
+        .glass-card:hover { transform: translateY(-5px); border-color: #3b82f6; box-shadow: 0 10px 30px rgba(59, 130, 246, 0.2); }
+        .copy-btn { cursor: pointer; transition: 0.2s; }
+        .copy-btn:hover { color: #3b82f6; }
+    </style>
 </head>
+<body class="p-4 md:p-12 overflow-x-hidden">
 
-<body>
-  <header class="topbar">
-    <div class="left">
-      <div class="lang">
-        <select id="uiLang" aria-label="UI language">
-          <option value="en" selected>English</option>
-          <option value="ar">العربية</option>
-          <option value="es">Español</option>
-          <option value="fr">Français</option>
-          <option value="de">Deutsch</option>
-          <option value="pt">Português</option>
-          <option value="tr">Türkçe</option>
-          <option value="id">Bahasa Indonesia</option>
-          <option value="hi">हिन्दी</option>
-          <option value="ru">Русский</option>
-          <option value="ja">日本語</option>
-          <option value="ko">한국어</option>
-        </select>
-        <span class="pill">UI</span>
-      </div>
+    <div class="max-w-6xl mx-auto">
+        <!-- HEADER INTERNET DOMINATION -->
+        <header class="flex flex-col md:flex-row justify-between items-center mb-16 gap-6">
+            <div>
+                <h1 class="text-4xl font-extrabold gradient-text tracking-tighter sm:text-6xl mb-2">DOMINATOR V2.</h1>
+                <p class="text-gray-400 font-mono text-sm">[STATUS: EXECUTING GROWTH PHASE 1/4...]</p>
+            </div>
+            <div id="creatorBadge" class="bg-blue-600/20 border border-blue-500/30 px-6 py-3 rounded-full flex items-center gap-3">
+                <i class="fas fa-fingerprint text-blue-500"></i>
+                <spn id="creator_id_display" class="font-bold font-mono tracking-widest">— Loading —</spn>
+            </div>
+        </header>
+
+        <!-- INPUT ACTION TERMINAL -->
+        <main>
+            <section class="glass-card p-2 rounded-2xl mb-12">
+                <div class="flex flex-col md:flex-row gap-4 p-2">
+                    <input type="text" id="subjectInput" placeholder="Input Domain or Subject (Example: Artificial Finance)..." 
+                           class="flex-1 bg-transparent p-4 min-h-[60px] text-lg outline-none custom-placeholder border-b border-gray-700">
+                    <button onclick="buildMasterStrategy()" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 px-10 rounded-xl transition rotate-hover shadow-lg">
+                        BUILD PACK <i class="ml-2 fas fa-bolt"></i>
+                    </button>
+                </div>
+            </section>
+
+            <!-- LOADING SKELETON (STAYS HIDDEN) -->
+            <div id="loading" class="hidden text-center justify-center space-y-4 mb-10">
+                <div class="animate-spin text-5xl text-blue-500 transition"><i class="fas fa-circle-notch"></i></div>
+                <p class="font-mono text-blue-400">ENGINEERING CONTENT BUNDLE...</p>
+            </div>
+
+            <!-- THE GLOBAL HUB GRID -->
+            <div id="resultOutput" class="content_area block space-y-8 animate-fade-in-up">
+                <!-- Data will injected Here Automatically -->
+            </div>
+        </main>
     </div>
 
-    <div class="center">
-      <div class="brand">AI DOMINATOR — Publisher</div>
-    </div>
-
-    <div class="right">
-      <div class="pill mono" id="baseUrlPill"></div>
-      <div class="pill ok" id="statusPill">Service online</div>
-    </div>
-  </header>
-
-  <main class="wrap">
-    <section class="panel">
-      <div class="panelHeader">
-        <h2 id="t_setup">Quick setup</h2>
-        <p class="muted" id="t_setup_sub">Fill the basics. Advanced inputs run automatically in the background.</p>
-      </div>
-
-      <div class="grid2">
-        <div class="field">
-          <label id="t_creator_id" for="creatorId">Session (auto)</label>
-          <div style="display:flex; gap:10px; align-items:center;">
-            <input id="creatorId" type="text" placeholder="auto-generated" readonly />
-            <button class="btn ghost" id="resetSession" type="button">Reset</button>
-          </div>
-          <div class="hint" id="t_creator_hint">Auto-created and stored in this browser (localStorage). No manual ID required.</div>
-        </div>
-
-        <div class="field">
-          <label id="t_lang" for="contentLang">Content language</label>
-          <select id="contentLang">
-            <option value="en" selected>English</option>
-            <option value="ar">Arabic (العربية)</option>
-            <option value="es">Spanish</option>
-            <option value="fr">French</option>
-            <option value="de">German</option>
-            <option value="pt">Portuguese</option>
-            <option value="tr">Turkish</option>
-            <option value="id">Indonesian</option>
-            <option value="hi">Hindi</option>
-            <option value="ru">Russian</option>
-            <option value="ja">Japanese</option>
-            <option value="ko">Korean</option>
-          </select>
-          <div class="hint" id="t_lang_hint">This language controls caption + hashtags + prompts output.</div>
-        </div>
-
-        <div class="field span2">
-          <label id="t_title" for="ideaTitle">Idea title</label>
-          <input id="ideaTitle" type="text" placeholder="e.g. 3 quick steps to improve results in digital marketing" />
-        </div>
-
-        <div class="field">
-          <label id="t_topic" for="topic">Topic / niche</label>
-          <input id="topic" type="text" placeholder="e.g. digital marketing" />
-          <div class="hint" id="t_topic_hint">Used for trending-hashtags selection.</div>
-        </div>
-
-        <div class="field">
-          <label id="t_mode" for="mode">Mode</label>
-          <select id="mode">
-            <option value="both" selected>both</option>
-            <option value="manual">manual</option>
-          </select>
-          <div class="hint" id="t_mode_hint">Keep both for best output.</div>
-        </div>
-      </div>
-
-      <div class="actions">
-        <button class="btn primary" id="btnGenerate">Generate Pack</button>
-        <button class="btn" id="btnHashtags">Fetch Trending Hashtags</button>
-        <button class="btn ghost" id="btnClear">Clear</button>
-      </div>
-
-      <div class="alert" id="alertBox" hidden></div>
-
-      <details class="debug">
-        <summary id="t_debug">Debug</summary>
-        <div class="debugGrid">
-          <div class="kv"><span>Hashtags endpoint</span><code>/v1/trending-hashtags</code></div>
-          <div class="kv"><span>Build-pack endpoint</span><code>/v1/build-pack</code></div>
-          <div class="kv"><span>Last error</span><code id="lastErr">-</code></div>
-        </div>
-      </details>
-    </section>
-
-    <section class="panel">
-      <div class="panelHeader">
-        <h2 id="t_outputs">Outputs</h2>
-        <p class="muted" id="t_outputs_sub">Clear cards, ready to copy/paste externally.</p>
-      </div>
-
-      <div id="results" class="cards">
-        <div class="empty" id="emptyState">
-          <div class="emptyTitle" id="t_empty_title">No results yet</div>
-          <div class="emptySub" id="t_empty_sub">Generate a pack to see your VEO3 prompt, caption + hashtags, hooks, script, and more.</div>
-        </div>
-      </div>
-    </section>
-  </main>
-
-  <footer class="foot">
-    <span class="muted">© AI DOMINATOR</span>
-    <span class="muted mono" id="buildInfo"></span>
-  </footer>
-
-<script>
-(() => {
-  // -------------------------------
-  // i18n (UI labels) - EN + AR (others fallback to EN)
-  // -------------------------------
-  const I18N = {
-    en: {
-      setup: "Quick setup",
-      setupSub: "Fill the basics. Advanced inputs run automatically in the background.",
-      creatorId: "Creator ID",
-      creatorHint: "Required. Use the creator_id you got from /v1/onboard",
-      lang: "Content language",
-      langHint: "This language controls caption + hashtags + prompts output.",
-      title: "Idea title",
-      topic: "Topic / niche",
-      topicHint: "Used for trending-hashtags selection.",
-      mode: "Mode",
-      modeHint: "Keep both for best output.",
-      generate: "Generate Pack",
-      hashtags: "Fetch Trending Hashtags",
-      clear: "Clear",
-      outputs: "Outputs",
-      outputsSub: "Clear cards, ready to copy/paste externally.",
-      emptyTitle: "No results yet",
-      emptySub: "Generate a pack to see your VEO3 prompt, caption + hashtags, hooks, script, and more.",
-      debug: "Debug",
-      serviceOnline: "Service online",
-      copying: "Copied",
-      copy: "Copy",
-      veoprompt: "VEO3 Video Prompt (segmented)",
-      captionTags: "TikTok caption + trending hashtags",
-      hooks: "Hooks (A/B/C)",
-      teleprompter: "Teleprompter script",
-      srt: "SRT captions",
-      timeline: "Timeline",
-      rawJson: "Raw JSON (for troubleshooting)",
-      advanced: "Advanced (SRT / Timeline / Raw JSON)",
-      source: "source",
-      updatedAt: "updated_at",
-      errMissing: "Please fill Creator ID first.",
-      errTitle: "Please fill Idea title.",
-      errTopic: "Please fill Topic/Niche to fetch hashtags."
-    },
-    ar: {
-      setup: "إعداد سريع",
-      setupSub: "املأ الأساسيات فقط. المدخلات المتقدمة تعمل تلقائيًا في الخلفية.",
-      creatorId: "معرّف المستخدم (Creator ID)",
-      creatorHint: "إلزامي. استخدم creator_id الذي حصلت عليه من /v1/onboard",
-      lang: "لغة المحتوى",
-      langHint: "هذه اللغة تتحكم في النص + الهاشتاجات + البرومبتات.",
-      title: "عنوان الفكرة",
-      topic: "المجال / النيتش",
-      topicHint: "يُستخدم لاختيار هاشتاجات الترند.",
-      mode: "الوضع",
-      modeHint: "اتركها both لأفضل النتائج.",
-      generate: "توليد الحزمة",
-      hashtags: "جلب هاشتاجات ترند",
-      clear: "مسح",
-      outputs: "المخرجات",
-      outputsSub: "بطاقات واضحة جاهزة للنسخ واللصق.",
-      emptyTitle: "لا توجد نتائج بعد",
-      emptySub: "قم بتوليد حزمة لعرض برومبت VEO3 والنص والهاشتاجات والهوكات والسكربت وغيرها.",
-      debug: "تصحيح",
-      serviceOnline: "الخدمة تعمل",
-      copying: "تم النسخ",
-      copy: "نسخ",
-      veoprompt: "برومبت VEO3 للفيديو (مقسّم)",
-      captionTags: "نص تيكتوك + هاشتاجات ترند",
-      hooks: "الهوكات (A/B/C)",
-      teleprompter: "سكربت القراءة (Teleprompter)",
-      srt: "ترجمة SRT",
-      timeline: "التايم لاين",
-      rawJson: "JSON الخام (للتشخيص)",
-      advanced: "متقدم (SRT / Timeline / Raw JSON)",
-      source: "المصدر",
-      updatedAt: "آخر تحديث",
-      errMissing: "أدخل Creator ID أولًا.",
-      errTitle: "أدخل عنوان الفكرة.",
-      errTopic: "أدخل المجال/النيتش لجلب هاشتاجات الترند."
-    }
-  };
-
-  const $ = (id) => document.getElementById(id);
-  const uiLang = $("uiLang");
-  const contentLang = $("contentLang");
-  const baseUrlPill = $("baseUrlPill");
-  const statusPill = $("statusPill");
-  const alertBox = $("alertBox");
-  const results = $("results");
-  const emptyState = $("emptyState");
-  const lastErr = $("lastErr");
-
-  const state = {
-    ui: "en",
-    lastHashtags: null,
-    lastBuildPack: null
-  };
-
-  const BASE = window.location.origin;
-  baseUrlPill.textContent = BASE;
-
-  // Apply UI language
-  function t(key){
-    const dict = I18N[state.ui] || I18N.en;
-    return dict[key] ?? I18N.en[key] ?? key;
-  }
-
-  function applyI18n(){
-    document.documentElement.lang = state.ui === "ar" ? "ar" : "en";
-    document.documentElement.dir = state.ui === "ar" ? "rtl" : "ltr";
-
-    $("t_setup").textContent = t("setup");
-    $("t_setup_sub").textContent = t("setupSub");
-    $("t_creator_id").textContent = t("creatorId");
-    $("t_creator_hint").textContent = t("creatorHint");
-    $("t_lang").textContent = t("lang");
-    $("t_lang_hint").textContent = t("langHint");
-    $("t_title").textContent = t("title");
-    $("t_topic").textContent = t("topic");
-    $("t_topic_hint").textContent = t("topicHint");
-    $("t_mode").textContent = t("mode");
-    $("t_mode_hint").textContent = t("modeHint");
-    $("btnGenerate").textContent = t("generate");
-    $("btnHashtags").textContent = t("hashtags");
-    $("btnClear").textContent = t("clear");
-    $("t_outputs").textContent = t("outputs");
-    $("t_outputs_sub").textContent = t("outputsSub");
-    $("t_empty_title").textContent = t("emptyTitle");
-    $("t_empty_sub").textContent = t("emptySub");
-    $("t_debug").textContent = t("debug");
-    statusPill.textContent = t("serviceOnline");
-  }
-
-  uiLang.addEventListener("change", () => {
-    state.ui = uiLang.value;
-    applyI18n();
-  });
-
-  // -------------------------------
-  // UI Helpers
-  // -------------------------------
-  function showAlert(msg, type="info"){
-    alertBox.hidden = false;
-    alertBox.className = "alert " + type;
-    alertBox.textContent = msg;
-  }
-  function clearAlert(){
-    alertBox.hidden = true;
-    alertBox.textContent = "";
-    alertBox.className = "alert";
-  }
-
-  function escapeHtml(str){
-    return String(str ?? "")
-      .replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;")
-      .replaceAll('"',"&quot;").replaceAll("'","&#039;");
-  }
-
-  async function copyToClipboard(text){
-    try{
-      await navigator.clipboard.writeText(text);
-      return true;
-    }catch(e){
-      // fallback
-      const ta = document.createElement("textarea");
-      ta.value = text;
-      document.body.appendChild(ta);
-      ta.select();
-      const ok = document.execCommand("copy");
-      document.body.removeChild(ta);
-      return ok;
-    }
-  }
-
-  function card(title, bodyHtml, copyText=null, metaHtml=null){
-    const el = document.createElement("div");
-    el.className = "card";
-
-    const head = document.createElement("div");
-    head.className = "cardHead";
-
-    const h = document.createElement("div");
-    h.className = "cardTitle";
-    h.textContent = title;
-
-    const actions = document.createElement("div");
-    actions.className = "cardActions";
-
-    if(copyText !== null){
-      const btn = document.createElement("button");
-      btn.className = "btn small";
-      btn.textContent = t("copy");
-      btn.addEventListener("click", async () => {
-        const ok = await copyToClipboard(copyText);
-        btn.textContent = ok ? t("copying") : "Failed";
-        setTimeout(()=> btn.textContent = t("copy"), 900);
-      });
-      actions.appendChild(btn);
-    }
-
-    head.appendChild(h);
-    head.appendChild(actions);
-
-    const body = document.createElement("div");
-    body.className = "cardBody";
-    body.innerHTML = bodyHtml;
-
-    el.appendChild(head);
-    if(metaHtml){
-      const meta = document.createElement("div");
-      meta.className = "cardMeta";
-      meta.innerHTML = metaHtml;
-      el.appendChild(meta);
-    }
-    el.appendChild(body);
-    return el;
-  }
-
-  function preBlock(text){
-    return `<pre class="pre">${escapeHtml(text)}</pre>`;
-  }
-
-  function ensureResultsVisible(){
-    emptyState.style.display = "none";
-  }
-  function resetResults(){
-    results.innerHTML = "";
-    results.appendChild(emptyState);
-    emptyState.style.display = "block";
-  }
-
-  // -------------------------------
-  // Session / Creator ID (localStorage)
-  // We auto-create a creator_id on first use and persist it in the browser.
-  // -------------------------------
-  const LS_CREATOR_KEY = "dominatorv2_creator_id";
-
-  async function ensureSession(){
-    const input = $("creatorId");
-    const saved = (localStorage.getItem(LS_CREATOR_KEY) || "").trim();
-    if(saved){
-      input.value = saved;
-      return saved;
-    }
-
-    // Create a session server-side (also creates a creator profile with defaults)
-    const res = await fetch("/v1/session", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({})
-    });
-
-    let data = null;
-    try { data = await res.json(); } catch(_) { /* ignore */ }
-
-    if(!res.ok || !data?.creator_id){
-      throw new Error(data?.error || "Failed to create session");
-    }
-
-    localStorage.setItem(LS_CREATOR_KEY, data.creator_id);
-    input.value = data.creator_id;
-    return data.creator_id;
-  }
-
-  // -------------------------------
-  // Build a VEO3 prompt (client-side) from the generated kit
-  // (No on-screen text per your request; we focus on visuals + VO + SFX)
-  // -------------------------------
-  function buildVeoPromptSegments(payload, lang){
-    const title = payload?.title || "";
-    const script = payload?.script_teleprompter || "";
-    const shotList = Array.isArray(payload?.shot_list) ? payload.shot_list : [];
-    const hooks = payload?.hooks || {};
-    const bestHook = hooks?.C?.hook_text || hooks?.B?.hook_text || hooks?.A?.hook_text || "";
-
-    // Split into ~4 segments (0-8, 8-16, 16-24, 24-28)
-    // We keep it generic and clean for VEO3.
-    const baseStyle = (lang === "ar")
-      ? "فيديو عمودي 9:16، جودة عالية، إضاءة نظيفة، لقطة وجه قريبة + B-roll بسيط، أسلوب حديث احترافي، مونتاج سريع، بدون نص على الشاشة."
-      : "Vertical 9:16, high quality, clean lighting, close-up talking head + simple B-roll, modern professional style, fast pacing, no on-screen text.";
-
-    const vo = script.trim() ? script : bestHook;
-
-    const segments = [
-      {
-        t: "0-8s",
-        text:
-`[0-8s]
-STYLE: ${baseStyle}
-VISUAL: strong opening with confident presenter in a clean studio/office setup. Quick punch-in, shallow depth of field.
-AUDIO: voiceover (natural, energetic): "${vo.split("\n")[0] || bestHook}"
-SFX: subtle whoosh transitions, light ambient room tone.`
-      },
-      {
-        t: "8-16s",
-        text:
-`[8-16s]
-VISUAL: cut to B-roll related to the topic (laptop analytics dashboard, content calendar, social media planning). Return briefly to presenter.
-AUDIO: continue voiceover smoothly (no music overpowering speech).
-SFX: quick cuts, soft whoosh.`
-      },
-      {
-        t: "16-24s",
-        text:
-`[16-24s]
-VISUAL: presenter explains the 3-step solution; show supportive B-roll (checklist, calendar, metrics).
-AUDIO: voiceover continues. Maintain clarity and pacing.
-SFX: subtle transitions, no on-screen text.`
-      },
-      {
-        t: "24-28s",
-        text:
-`[24-28s]
-VISUAL: back to presenter, confident close-up, end with a clear call-to-action facial delivery.
-AUDIO: voiceover finishes with CTA line from script.
-SFX: gentle outro whoosh, end clean.`
-      }
-    ];
-
-    // Add extra context from shot_list if present
-    const extras = shotList.length ? "\nNOTES (shot ideas):\n- " + shotList.join("\n- ") : "";
-    return segments.map(s => s.text).join("\n\n") + extras;
-  }
-
-  // -------------------------------
-  // API Calls
-  // -------------------------------
-  async function fetchHashtags(){
-    clearAlert();
-    const creatorId = await ensureSession();
-    const topic = $("topic").value.trim();
-    const lang = $("contentLang").value;
-
-    if(!topic){
-      showAlert(t("errTopic"), "warn");
-      return null;
-    }
-
-    const url = new URL(BASE + "/v1/trending-hashtags");
-    url.searchParams.set("creator_id", creatorId);
-    url.searchParams.set("limit", "12");
-    url.searchParams.set("lang", lang);
-    url.searchParams.set("topic", topic);
-
-    const r = await fetch(url.toString(), { method: "GET" });
-    if(!r.ok){
-      const txt = await r.text();
-      throw new Error("hashtags: " + txt);
-    }
-    const json = await r.json();
-    state.lastHashtags = json;
-    return json;
-  }
-
-  async function buildPack(){
-    clearAlert();
-    const creatorId = await ensureSession();
-    const ideaTitle = $("ideaTitle").value.trim();
-    const topic = $("topic").value.trim();
-    const lang = $("contentLang").value;
-    const mode = $("mode").value;
-
-    if(!ideaTitle){
-      showAlert(t("errTitle"), "warn");
-      return null;
-    }
-
-    // Minimal payload (hide advanced fields; system handles sane defaults)
-    // We still pass language + publish hour to improve caption and VEO3 prompts.
-    const payload = {
-      creator_id: creatorId,
-      idea_title: ideaTitle,
-      topic: topic,
-      language: lang,
-      publish_hour_local: new Date().getHours(),
-      timezone_offset_min: new Date().getTimezoneOffset(),
-      angle: "Saveable steps list",
-      value_promise: (lang === "ar") ? "خطة بسيطة: نفّذ، قِس، عدّل." : "Simple plan: execute, measure, iterate.",
-      preferred_length_sec: 28,
-      mode: mode
-    };
-
-    const r = await fetch(BASE + "/v1/build-pack", {
-      method: "POST",
-      headers: { "Content-Type": "application/json; charset=utf-8" },
-      body: JSON.stringify(payload)
-    });
-
-    const txt = await r.text();
-    if(!r.ok){
-      throw new Error("build-pack: " + txt);
-    }
-    const json = JSON.parse(txt);
-    state.lastBuildPack = json;
-    return json;
-  }
-
-  // -------------------------------
-  // Render
-  // -------------------------------
-  function renderAll(){
-    resetResults();
-    ensureResultsVisible();
-
-    // 1) From build-pack: find ready_to_record_kit
-    const pack = state.lastBuildPack;
-    const hashtags = state.lastHashtags;
-
-    if(pack?.artifacts?.length){
-      const kit = pack.artifacts.find(a => a.type === "ready_to_record_kit")?.payload;
-
-      if(kit){
-        // VEO3 prompt card
-        const veo = kit.veo3_prompt || buildVeoPromptSegments(kit, $("contentLang").value);
-        results.appendChild(card(
-          t("veoprompt"),
-          preBlock(veo),
-          veo
-        ));
-
-        // Caption + hashtags card (prefer trending endpoint; else fallback to kit.hashtags)
-        const cap = kit.caption || "";
-        const tags = (hashtags?.hashtags && Array.isArray(hashtags.hashtags) && hashtags.hashtags.length)
-          ? hashtags.hashtags
-          : (Array.isArray(kit.hashtags) ? kit.hashtags : []);
-
-        const mergedCaption = (cap ? cap.trim() : "") + "\n\n" + tags.join(" ");
-        const meta = hashtags
-          ? `<div class="metaLine"><span>${escapeHtml(t("source"))}:</span> <code>${escapeHtml(hashtags.source || "-")}</code></div>
-             <div class="metaLine"><span>${escapeHtml(t("updatedAt"))}:</span> <code>${escapeHtml(hashtags.updated_at || "-")}</code></div>`
-          : null;
-
-        results.appendChild(card(
-          t("captionTags"),
-          preBlock(mergedCaption.trim()),
-          mergedCaption.trim(),
-          meta
-        ));
-
-        // Hooks card (clear + copy-ready)
-        const hooks = kit.hooks || {};
-        const hookKeys = ["A","B","C"];
-
-        const hooksCopy = hookKeys.map(k => {
-          const ht = hooks?.[k]?.hook_text || "-";
-          const os = hooks?.[k]?.onscreen_text || "-";
-          return `${k}) ${ht}
-On-screen: ${os}`;
-        }).join("\n\n");
-
-        const hooksHtml = `
-          <div style="display:grid;gap:12px">
-            ${hookKeys.map(k => {
-              const ht = escapeHtml(hooks?.[k]?.hook_text || "-");
-              const os = escapeHtml(hooks?.[k]?.onscreen_text || "-");
-              return `
-                <div style="border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:12px;background:rgba(255,255,255,.02)">
-                  <div style="font-weight:800;letter-spacing:.02em;margin-bottom:8px">Variant ${k}</div>
-                  <div style="line-height:1.55">${ht}</div>
-                  <div style="margin-top:8px;color:rgba(255,255,255,.65)"><strong>On-screen</strong>: ${os}</div>
-                </div>`;
-            }).join("")}
-          </div>
-        `;
-
-        results.appendChild(card(t("hooks"), hooksHtml, hooksCopy));
-
-        // Teleprompter script card
-        const teleText = kit.script_teleprompter || "";
-        if(teleText){
-          results.appendChild(card(t("teleprompter"), preBlock(teleText), teleText));
+    <script shadow>
+        window.onload = async () => {
+             // التحقق الآلي للصانع (The Sovereign Session)
+            let creatorId = localStorage.getItem('CREATOR_DOM_B1');
+            if(!creatorId){
+                const res = await fetch('/v1/session');
+                const data = await res.json();
+                creatorId = data.creator_id;
+                localStorage.setItem('CREATOR_DOM_B1', creatorId);
+            }
+            document.getElementById('creator_id_display').innerText = creatorId;
+        };
+
+        const copyText = (cid) => {
+            const elm = document.getElementById(cid);
+            navigator.clipboard.writeText(elm.innerText);
+            
+            const btn = document.querySelector(`[onclick="copyText('${cid}')"]`);
+            btn.innerHTML = `<i class='fas fa-check'></i> Copied!`;
+            setTimeout(()=>{
+                btn.innerHTML = `<i class='far fa-clone'></i>`;
+            }, 2000);
+        };
+
+        async function buildMasterStrategy() {
+            const domain = document.getElementById('subjectInput').value;
+            if(!domain) return alert("System requires a Target Focus.");
+
+            document.getElementById('loading').classList.remove('hidden');
+            document.getElementById('resultOutput').innerHTML = '';
+
+            try {
+                const response = await fetch('/v1/build-pack', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ subject: domain })
+                });
+                
+                const master = await response.json();
+                renderResult(master.content_pack);
+                
+            } catch(e) { console.error("Protocol Breach", e); } 
+            finally { document.getElementById('loading').classList.add('hidden'); }
         }
 
-        // Advanced: SRT / Timeline / Raw JSON (collapsed)
-        const adv = document.createElement("details");
-        adv.className = "debug";
-        adv.innerHTML = `<summary>${escapeHtml(t("advanced"))}</summary><div style="display:grid;gap:12px;margin-top:12px" id="advInner"></div>`;
-        results.appendChild(adv);
-        const advInner = adv.querySelector("#advInner");
+        function renderResult(p) {
+            let veops = p.v3_logic.map((v, i) => `
+                <div class="bg-zinc-900 rounded-xl p-6 border-l-4 border-blue-600">
+                    <div class="flex justify-between items-center mb-4">
+                        <span class="text-xs font-mono uppercase text-blue-500">Video Core Pt. ${i+1} [${v.v_length}]</span>
+                        <div onclick="copyText('veo_src_${i}') text-sm class="copy-btn"><i class="far fa-clone"></i></div>
+                    </div>
+                    <p id="veo_src_${i}" class="text-gray-300 leading-relaxed font-semibold italic">"${v.veo_prompt}"</p>
+                </div>`).join('');
 
-        const srtText = kit.onscreen_text_srt || "";
-        if(srtText){
-          advInner.appendChild(card(t("srt"), preBlock(srtText), srtText));
+            const hubMarkup = `
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 ">
+                    <div class="lg:col-span-1 space-y-6">
+                        <div class="glss-card bg-zinc-700/50 p-6 rounded-2xl border border-blue-500">
+                           <h3 class="font-bold flex justify-between uppercase mb-3 text-red-400 italic">Neural Hook (Copy 1st) : <i class="copy-btn fas fa-heart ms-2" onclick="copyText('hook_res')"></i></h3>
+                           <p id="hook_res" class="text-xl font-bold">${p.hook}</p>
+                        </div>
+
+                         <div class="p-6 bg-zinc-800 rounded-2xl">
+                           <h3 class="text-blue-200 font-bold mb-3"><i class="fas fa-bullhorn mr-2"></i> MASTER CAPTION : <i class="copy-btn fas fa-share ms-2" onclick="copyText('capt_res')"></i></h3>
+                           <p id="capt_res" id="capt_res" class="">${p.caption}<br><br><span class="text-blue-500">${p.hashtags}</span></p>
+                        </div>
+                    </div>
+                    
+                    <div class="lg:col-span-2 space-y-4">
+                        <h2 class="text-2xl font-bold mb-4 flex items-center gap-2"><i class="fas fa-video text-teal-400"></i> GLOBAL GENERATION MATRIX</h2>
+                         ${veops}
+                        <div class="bg-indigo-900/30 p-8 rounded-2xl border border-indigo-400 shadow-xl mt-12 w-full">
+                           <h3 class="text-indigo-400 uppercase font-black mb-3">Narratory Command Unit (Final Audio Read):</h3>
+                           <p id="script_unit" class="text-lg leading-[1.8] font-semibold">${p.script}</p>
+                           <button class="mt-4 p-2 bg-indigo-500 text-sm h rounded" onclick="copyText('script_unit')">Copy Audio Script <i class="fas fa-microphone"></i></button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.getElementById('resultOutput').innerHTML = hubMarkup;
         }
-
-        const timelineText = kit.timeline ? JSON.stringify(kit.timeline, null, 2) : "";
-        if(timelineText){
-          advInner.appendChild(card(t("timeline"), preBlock(timelineText), timelineText));
-        }
-
-        const raw = JSON.stringify(pack, null, 2);
-        advInner.appendChild(card(t("rawJson"), preBlock(raw), raw));
-    } else {
-      // No pack yet; show hashtags only if present
-      if(hashtags?.hashtags?.length){
-        const tagsOnly = hashtags.hashtags.join(" ");
-        results.appendChild(card(
-          t("captionTags"),
-          preBlock(tagsOnly),
-          tagsOnly,
-          `<div class="metaLine"><span>${escapeHtml(t("source"))}:</span> <code>${escapeHtml(hashtags.source || "-")}</code></div>
-           <div class="metaLine"><span>${escapeHtml(t("updatedAt"))}:</span> <code>${escapeHtml(hashtags.updated_at || "-")}</code></div>`
-        ));
-      } else {
-        emptyState.style.display = "block";
-      }
-    }
-  }
-  }
-  // -------------------------------
-  // Buttons
-  // -------------------------------
-  $("btnHashtags").addEventListener("click", async () => {
-    try{
-      const btn = $("btnHashtags");
-      btn.disabled = true;
-      btn.textContent = "…";
-      const h = await fetchHashtags();
-      if(h){
-        showAlert("Hashtags loaded successfully.", "ok");
-        renderAll();
-      }
-    }catch(e){
-      lastErr.textContent = e.message || String(e);
-      showAlert(e.message || String(e), "danger");
-    }finally{
-      const btn = $("btnHashtags");
-      btn.disabled = false;
-      btn.textContent = t("hashtags");
-    }
-  });
-
-  $("btnGenerate").addEventListener("click", async () => {
-    try{
-      const btn = $("btnGenerate");
-      btn.disabled = true;
-      btn.textContent = "…";
-      // Fetch hashtags first (best UX) if possible
-      try{ await fetchHashtags(); } catch(_e) {}
-      const p = await buildPack();
-      if(p){
-        showAlert("Pack generated successfully.", "ok");
-        renderAll();
-      }
-    }catch(e){
-      lastErr.textContent = e.message || String(e);
-      showAlert(e.message || String(e), "danger");
-    }finally{
-      const btn = $("btnGenerate");
-      btn.disabled = false;
-      btn.textContent = t("generate");
-    }
-  });
-
-  $("btnClear").addEventListener("click", () => {
-    clearAlert();
-    state.lastHashtags = null;
-    state.lastBuildPack = null;
-    lastErr.textContent = "-";
-    resetResults();
-  });
-
-  // Surface JS crashes in UI
-  window.addEventListener("error", (ev) => {
-    lastErr.textContent = ev?.message || "JS error";
-    showAlert((ev?.message || "JS error") + " (see Debug)", "danger");
-  });
-
-  // Build info (simple)
-  $("buildInfo").textContent = new Date().toISOString();
-
-  // init
-  applyI18n();
-  resetResults();
-})();
-</script>
+    </script>
 </body>
 </html>
-
