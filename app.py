@@ -5,72 +5,60 @@ from flask import Flask, render_template, request, jsonify
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET", secrets.token_hex(24))
 
-def get_cinematic_director_notes():
-    """حقن تعليمات التكوين السينمائي الرأسي الفائق لـ VEO3"""
-    return (
-        "Aspect ratio 9:16, centered composition for TikTok vertical flow. "
-        "Dynamic high-frequency lighting, cinematic depth, fluid motion. "
-        "Unreal Engine 5 style hyper-clarity. Directed by AI DominatorV2 Master UI."
-    )
-
-def generate_full_content(subject, lang):
-    notes = get_cinematic_director_notes()
+def get_optimized_data(subject, lang):
+    """صانع المحتوى المسلح: يجمع الفلسفة الإخراجية واللغة"""
+    aspect = "Vertical 9:16 optimized for Social Media (TikTok/High Definition Cinematic)."
     
     if lang == "ar":
-        hook = f"صناعة {subject} كانت مجرد هواية، اليوم هي سلاح السيطرة الصامت! 🕵️"
-        script = (
-            f"في ظلال العصر الرقمي، {subject} هي المحرك الجديد للثروات. "
-            f"البحث عن التميز انتهى هنا. اتبع المسار المهندس لبناء هيمنتك الخاصة."
-        )
-        caption = f"خارطة طريق لـ {subject} الحقيقية. انضم للمستقبل. 🌎"
-        tags = "#ذكاء_اصطاني #هيمنة_رقمية #سعودي_تك #مستقبل"
-        scenes = [
-            f"Dramatic close-up vertical tracking of {subject} concepts into futuristic light",
-            "Wide angle vertical showcase of a bustling cyberpunk city focus on subject",
-            "Slow motion focus on a mastermind looking into holographic maps representing the dream"
-        ]
+        content = {
+            "hook": f"سر الهيمنة في مجال {subject} بحلول عام 2026! 🚀",
+            "val_script": f"في أعماق السوق الرقمي، يتصدر {subject} الواجهة. لا أحد يخبرك كيف تسيطر على الخوارزميات، لكن السيكولوجيا واضحة: الجذب أو الاندثار. التجهيز يبدأ الآن بلغة القوة.",
+            "val_caption": f"خطة الهيمنة لـ {subject}. المستقبل للمبادئين ومهندسي الأنظمة. 🌎",
+            "val_tags": "#تقاعد_تقني #نمو #المركز #أدوات_فجوة",
+            "scenes": [
+                f"Close up lens: High-depth detail of symbols from {subject} era. Center weighted composition.",
+                f"Establishing shot: Massive tech infrastructure reacting to {subject}, neon blue lights flare.",
+                f"Point of view: Interaction with virtual glass interface designing the future of {subject}."
+            ]
+        }
     else:
-        hook = f"Stopping you for a second: {subject} is rebalancing the ecosystem. Are you ready?"
-        script = (
-            f"Welcome to the aftermath of {subject}. In this high-tension journey, we decode success architectures. "
-            f"Efficiency isn't enough; search for absolute dominance."
-        )
-        caption = f"Decoding survival with {subject}. Rise above the clutter. 🔍"
-        tags = "#DominatorGlobal #TechRevolution #AIAssetsX #ViralFramework"
-        scenes = [
-            f"Vertical pan shot across hyper-digital surfaces depicting {subject} future",
-            "Fisheye cental POV through technological gates exploring subject hidden data",
-            "Saturated neon transition from darkness to high frequency subject mastery"
-        ]
+        content = {
+            "hook": f"Everyone ignored {subject} until now. Are you waiting for a crash? 🌋",
+            "val_script": f"The tectonic landscape of {subject} is redefined tonight. Don't play the game, rebuild the rules from the ground up to guarantee algorithmic dominance. Success is inevitable when architecture is flawless.",
+            "val_caption": f"Executing Phase One for {subject}. Stay Dominant. 👁️⚡",
+            "val_tags": "#AlphaFocus #DigitalAscension #TrendSurfing #LegacyBuild",
+            "scenes": [
+                f"Dynamic crane-to-portrait focus of an elite laboratory relating to theme: {subject}.",
+                f"Macro visuals of pulsating power sources shifting to represent theme values of {subject}.",
+                f"Cinematic focus on an intense sunrise overlaid with raw data flowing centered for TikTok style."
+            ]
+        }
 
-    # توضيب البرومبتات
-    prompt_list = []
-    for s in scenes:
-        prompt_list.append(f"SCENE: {s}. {notes}")
+    modified_scenes = [f"{s} | PROMPT SPECS: {aspect}, Cinematic colors, 8K ultra detail." for s in content["scenes"]]
     
     return {
-        "hook": hook,
-        "script": script,
-        "caption": f"{caption}\n\n{tags}",
-        "prompts": prompt_list
+        "is_arabic": (lang == "ar"),
+        "hook": content["hook"],
+        "script": content["val_script"], 
+        "caption": content["val_caption"],
+        "tags": content["val_tags"],
+        "prompts": modified_scenes
     }
 
 @app.route("/")
-def index():
+def home():
     return render_template("index.html")
 
-@app.route("/v1/session", methods=["GET"])
-def get_session():
-    return jsonify({"creator_id": "DOM_" + secrets.token_hex(4).upper()})
-
-@app.route("/v1/build-pack", methods=["POST"])
-def build_pack():
+@app.route("/v1/build", methods=["POST"])
+def build_engine():
     try:
         data = request.json
-        res = generate_full_content(data.get("subject", "Tech"), data.get("lang", "en"))
-        return jsonify({"success": True, "payload": res})
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)})
+        subject = data.get("subject", "Alpha Control")
+        lang = data.get("lang", "en")
+        response = get_optimized_data(subject, lang)
+        return jsonify(response)
+    except:
+        return jsonify({"error": "System Malfunction"}), 500
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
