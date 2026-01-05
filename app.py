@@ -3,62 +3,71 @@ import secrets
 from flask import Flask, render_template, request, jsonify
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("FLASK_SECRET", secrets.token_hex(24))
+# جدار الحماية للجلسات البرمجية
+app.secret_key = os.environ.get("FLASK_SECRET", secrets.token_hex(32))
 
-# قاموس المعرفة الاستخباراتي DNA Knowledge base
-def analyze_niche_dna(subject, lang):
-    sub = subject.lower()
-    # نظام ترندات افتراضي ذكي "Synthetic Trends" يتغير حسب النيش
-    if any(k in sub for k in ["تجارة", "بزنيس", "فلوس", "اقتصاد", "coffee", "business"]):
-        niche_tags = ("ar", ["#قهوة_مختصة_السعودية", "#استثمار_رابح", "#بزنس_تيك", "#تيكتاك_بزنس"]) if lang=="ar" else ("en", ["#ArabicaProfits", "#NicheEmpire", "#BizLogic", "#TikTokGrowth"])
-    elif any(k in sub for k in ["ذكاء", "ai", "تقنية", "tech"]):
-        niche_tags = ("ar", ["#ذكاء_اصطناعي", "#تكنولوجيا_المستقبل", "#بناء_الأنظمة", "#هندسة_الأرباح"]) if lang=="ar" else ("en", ["#GlobalAI", "#TechInnovation", "#FutureStack", "#AutomationRules"]) 
-    else:
-        niche_tags = (lang, ["#DOMv2", "#GameChanger", "#NextLevel", "#SovereigntyNow"])
+def niche_intelligence_distillery(subject, lang):
+    """محرك تصفير المسافة بين التوقع المليوني للترند والتنفيذ النصي"""
+    s = subject.lower().strip()
+    # 🧬 Dynamic Keyword Sentinel
+    if any(q in s for q in ["اقتصاد", "تجارة", "بيزنس", "أموال", "business", "market", "trade"]):
+        viral_tags_pool = ["#اقتصاد_المنطقة", "#Alpha_Money_VIB", "#سوق_الأجانب", "#أتمتة_الثروة"] if lang=="ar" else ["#WealthHack", "#MarketPulse", "#ProfitDNA", "#ScalingFast"]
+        script_style = "High Fidelity Wealth Logic"
+    elif any(q in s for q in ["ذكاء", "ai", "تقنية", "روبوت", "saudi", "vision"]):
+         viral_tags_pool = ["#منصة_المستقبل", "#مواكبي_العصر", "#تقنيات_التتفيذ", "#ذكاء_أخلاقي"] if lang=="ar" else ["#NeuralFuture", "#AI_Dominance", "#VisionaryTech", "#CyberPulse"]
+         script_style = "Accelerated Techno-Thriller"
+    else: 
+         viral_tags_pool = ["#TrendDNA", "#MarketLeap", "#GrowthHack", "#NextMillionView"]
+         script_style = "Abstract Trend Psychology"
+
+    hashtags = " ".join(viral_tags_pool)
+
+    # لغة صناعة الجواهر لكل نيش
+    ar_templates = {
+        "h": [f"السؤال الصعب للعام الحالي: هل سينجو مشروع {subject} الخاص بك؟ 🌋", f"لماذا الجميع يتجنب الحقيقة المحرجة حول {subject}؟ سأخبرك بها بعبارتين. 🧐"],
+        "c": [f"تحليل الـ DNA المتوحش لمستجدات الـ {subject}. المستقبل يكتب بالجرأة فقط.", f"من عمق الميدان وليس من الورق؛ إليكم حزمة السعي المهني لـ {subject}. ابعد المشككين عن طريقك."]
+    }
 
     if lang == "ar":
-        payload = {
-            "hook": f"ما ستسمعة عن سيكولوجية {sub} سيصيب منتقديك بذهول حاد... استمع بعمق 🌋",
-            "script": f"قواعد اللعبة المهترئة في {sub} انتهت اليوم. الخبراء الذين تفادوك بـ 15 عام خبرة يستثمرون الآن في الهوية الرقمية المترابطة. نحن ننبش في डीएनए النجاح، لنبني نظاماً يتوسع بمفرده. التفت لكل تفصيل هنا... لأن القفزة تبدأ من قاع المعرفة.",
-            "caption": f"الحسابات الفلكية لحقبة {sub} الجديدة. ابق مهيمناً ولا تكن تابعاً. 🧠⚡ \n  {' '.join(niche_tags[1])}",
-            "visuals": [
-                f"CINEMATIC V9:16: High-detail aesthetic shot of core {sub} elements, anamorphic lens flares, center framing.",
-                "VERTICAL DRONE SCAN: futuristic neon surroundings depicting rapid growth transitions.",
-                "CYBER VLOG MOTION: Subject focused on intense data visualization with Moody aesthetic lighting."
-            ]
-        }
+        hook = secrets.choice(ar_templates["h"])
+        caption = f"{secrets.choice(ar_templates['c'])} \n\n {hashtags}"
+        script = f"استمع جيداً... الخارق ليس المحتوى المكرر، بل الشفرة الجينية DNA لإيقاع الـ {subject}. الصناعة تبحث الآن عن (تأثير الندرة)، وكل حرف نخرجه الآن مصمم لاختراق انقسام الاهتمام اللحظي. ابدأ بالتنفيذ قبل البراعة... الهيمنة قادمة بجدارة."
+        vis = [
+            f"V-Scene 01: [Deeper Zoom - Kinetic] Micro-details of {subject} textures reacting to dark futuristic biolights.",
+            f"V-Scene 02: [Panoramic - Flow] Wide vertical lens tracking a high-tech city pulse focus on {subject} identity.",
+            f"V-Scene 03: [Interface - Centered] Digital transparent maps charting the viral growth of {subject} systemically."
+        ]
     else:
-        payload = {
-            "hook": f"Is {sub} honestly a gamble? Or are you just lacking the Dominator Blueprint? 🧬",
-            "script": f"Industry veterans won't reveal the true catalyst behind {sub} success. It's not about saturation; it's about calibrated distribution. What 15 years taught us is built into this workflow. Stop thinking—start commanding your niche architecture today.",
-            "caption": f"Global Sovereignty Protocol for {sub}. Phase 1 Activated. 🌍🦾 \n {' '.join(niche_tags[1])}",
-            "visuals": [
-                f"9x16 VERTICAL PRO-GRADE: Close focus on {sub} mastery, cinematic grading, extreme sharpness.",
-                "MOTION GRAPH 4K: Dark atmospheric transition effects visualizing the core of subject dominance.",
-                "VEO3 CINEMA: Tracking masterclasses lighting style, center weighted, minimal elements focus."
-            ]
-        }
-    return payload
+        # English Neural Engine Core
+        hook = f"Everyone is debating {subject}... but only 1% are actually executing correctly. Watch why. 📊"
+        caption = f"Building the Sovereign Asset for {subject}. Step into the grid. 🦾🧬\n {hashtags}"
+        script = f"Strategy bypass in PROGRESS. In the niche where {subject} thrives, ordinary is an ERROR message. We have calibrated the output for high frequency algorithmic feedback. From now, your identity is not just talk; you are an architect of the trend environment itself."
+        vis = [
+            f"VEOPROMPT-9x16-EPIC: Macro lens focus on core material components of {subject}, cinematic smoke atmosphere.",
+            f"CYBERPUNK SHOT: Silhouette of an operator looking into the future of {subject} with neon ray accents.",
+            f"MINIMAL 88: Rapid artistic edits visualizing the cellular core of the {subject} market shift."
+        ]
+
+    return {"hook": hook, "script": script, "caption": caption, "vis": vis}
 
 @app.route("/")
-def home():
+def index():
     return render_template("index.html")
 
-@app.route("/v1/session", methods=["GET"])
-def get_session():
-    uid = "DOM-MVP-" + secrets.token_hex(4).upper()
-    return jsonify({"creator_id": uid})
+@app.route("/v1/session")
+def session_reg():
+    return jsonify({"creator_id": "DOMX-" + secrets.token_hex(5).upper()})
 
-@app.route("/v1/build-pack", methods=["POST"])
-def build_pack():
+@app.route("/v1/generate", methods=["POST"])
+def build_engine():
+    data = request.json
     try:
-        data = request.json
-        subject = data.get("subject", "Strategy Execution")
+        subject = data.get("subject", "Viral Strategy").strip()
         lang = data.get("lang", "en")
-        raw_out = analyze_niche_dna(subject, lang)
-        return jsonify({"pack": raw_out})
+        outcome = niche_intelligence_distillery(subject, lang)
+        return jsonify({"success": True, "data": outcome})
     except:
-        return jsonify({"error": "System Crash Core-709"}), 500
+        return jsonify({"success": False, "msg": "Nucleur Logic Error"}), 500
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
