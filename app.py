@@ -5,93 +5,60 @@ from flask import Flask, render_template, request, jsonify
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET", secrets.token_hex(24))
 
-# نظام DNA الذكاء الاصطناعي (ألا عهود بعد الآن للتنمر على النيش)
-def generate_strategic_narrative(subject, lang):
-    """خوارزمية تستهدف توليد (تجارب) وليس نصوص. بناءً على 'دنا' المشاهدات المليونية."""
-    
-    # 1. كشف نيش المحتوى وتصنيف نغمة السوق له
-    dom_subject = subject.lower()
-    tone = "Curiosity/Hype" # نغمة الفهلوة الجذابة الافتراضية
-    if "مال" in dom_subject or "تجارة" in dom_subject or "بزنيس" in dom_subject or "مال" in dom_subject:
-        tone = "High Stakes / Actionable"
-    elif "مستقبل" in dom_subject or "اذكاء" in dom_subject:
-        tone = "Utopian/Distopian Contrast"
-    elif "صناعة" in dom_subject or "ابتكار" in dom_subject:
-        tone = "Technological Depth"
+# قاموس المعرفة الاستخباراتي DNA Knowledge base
+def analyze_niche_dna(subject, lang):
+    sub = subject.lower()
+    # نظام ترندات افتراضي ذكي "Synthetic Trends" يتغير حسب النيش
+    if any(k in sub for k in ["تجارة", "بزنيس", "فلوس", "اقتصاد", "coffee", "business"]):
+        niche_tags = ("ar", ["#قهوة_مختصة_السعودية", "#استثمار_رابح", "#بزنس_تيك", "#تيكتاك_بزنس"]) if lang=="ar" else ("en", ["#ArabicaProfits", "#NicheEmpire", "#BizLogic", "#TikTokGrowth"])
+    elif any(k in sub for k in ["ذكاء", "ai", "تقنية", "tech"]):
+        niche_tags = ("ar", ["#ذكاء_اصطناعي", "#تكنولوجيا_المستقبل", "#بناء_الأنظمة", "#هندسة_الأرباح"]) if lang=="ar" else ("en", ["#GlobalAI", "#TechInnovation", "#FutureStack", "#AutomationRules"]) 
+    else:
+        niche_tags = (lang, ["#DOMv2", "#GameChanger", "#NextLevel", "#SovereigntyNow"])
 
-    # 2. توليد سلالة الترند (بانتظار API الخاص بك ولكن بذكاء بديل عالٍ)
-    dynamic_tags = []
-    if "قهوة" in dom_subject:
-        dynamic_tags = ["#قهوة_مختصة", "#VibeOn", "#ArabicaMaster", "#BaristaRules", "#تحميص_يدوي", "#SpecialtyLegacy"]
-    elif "اقتصاد" in dom_subject:
-        dynamic_tags = ["#MarketBoom2025", "#WealthUpdate", "#فلسفة_المال", "#SmartInvestment", "#GlobalTradeLoop"]
-    else: 
-         dynamic_tags = ["#BreakingGrowth", f"#(subject)_Pulse", "#SovereigntyNow", "#MarketLeaders", "#GameChanger"]
-
-    hashtags_str = " ".join(dynamic_tags[0:5])
-
-    # 3. بناء هيكيلة 'سكريبت السيطرة' باحترافية الخبير البشري
-    # اللغة العربية في مستويات 'الجذب النفسي' العالي
     if lang == "ar":
-        hooks = [
-            f"لا ينصح بمشاهدة هذا الفيديو لمزارع تقليدي، هنا نتحدث عن مستقبل الـ {subject} الصاعد!",
-            f"الرقم الذي ستسمعونه عندما نتحدث عن الـ {subject} لا يمكن لأحد استيعابه بسهولة. شاهد الحقيقة.",
-            f"إذا كنت تعتمد على الطرث التقليدية في {subject}.. هنيئاً لك الاندثار المبكر!"
-        ]
-        
-        # مخرجات سيتعدل الـ DNA بذكاء
-        descriptions = [
-            f"تعمقنا ليس في الـ {subject} العادية، إنما ننبش قاع الشفافية في سوق المليارات القادمة عبر التحول القهري للهياكل القديمة.",
-            f"هنا نبصق السيكولوجيا المهترئة ونتبنى سلالة جديدة كلياً في قطاع {subject}_DNA الرابح.",
-        ]
-
         payload = {
-            "hook": secrets.choice(hooks),
-            "script": f"اسمعني جيداً... في قبو اللعبة الرقمية والمنافسة الشرسة، موضوع الـ {subject} يكتنف الغموض لعدة دقائق. الخبراء فقط يعلمون أن 'الشفرة الوراثية' للمحتوى المليوني تبدأ من اللياقة المعرفية التي نحقنها هنا. اخرج الآن من الصندوق القديم... وانضم لنخبة التحكم.",
-            "caption": f"أسرار الـ {subject} كما تراها لغة الأذكياء فقط. الاستعداد لن يرحم المتقاعسين. 🌍 🦾\n {hashtags_str}",
-            "prompts": [
-                 f"MASTERPIECE VIEW: Epic hyper-detailed vertical drone focus on {subject}, slow ominous gimbal, unreal 8k vivid texture contrast.",
-                 f"MACRO CINEMATIC: Texture reflection of {subject} integrated into ultra-futuristic Riyadh-city architectural background.",
-                 f"POV INTENSE: Advanced creative desk showing real-logic patterns of market {subject}, blue moody rim lighting for Reels tension."
+            "hook": f"ما ستسمعة عن سيكولوجية {sub} سيصيب منتقديك بذهول حاد... استمع بعمق 🌋",
+            "script": f"قواعد اللعبة المهترئة في {sub} انتهت اليوم. الخبراء الذين تفادوك بـ 15 عام خبرة يستثمرون الآن في الهوية الرقمية المترابطة. نحن ننبش في डीएनए النجاح، لنبني نظاماً يتوسع بمفرده. التفت لكل تفصيل هنا... لأن القفزة تبدأ من قاع المعرفة.",
+            "caption": f"الحسابات الفلكية لحقبة {sub} الجديدة. ابق مهيمناً ولا تكن تابعاً. 🧠⚡ \n  {' '.join(niche_tags[1])}",
+            "visuals": [
+                f"CINEMATIC V9:16: High-detail aesthetic shot of core {sub} elements, anamorphic lens flares, center framing.",
+                "VERTICAL DRONE SCAN: futuristic neon surroundings depicting rapid growth transitions.",
+                "CYBER VLOG MOTION: Subject focused on intense data visualization with Moody aesthetic lighting."
             ]
         }
     else:
-        # الإنتاج باللغة الإنجليزية المتطورة (Expert Mindset)
         payload = {
-            "hook": f"Warning: Your competitors are weaponizing {subject} while you still 'plan'. Stop overthinking!",
-            "script": f"Listen strategically... The DNA of winning in {subject} is not about luck; it's about calibrated distribution. Industry experts don't want you to know how simple yet aggressive this transition can be. We don't adapt, we colonize the trend.",
-            "caption": f"Total Market Annihilation for {subject}. The elite blueprint is now activated. 👁️⚡\n {hashtags_str}",
-            "prompts": [
-                 f"9:16 RAW FILM GRAIN : Aggressive editing cut for {subject}, focal center high dynamic shadows.",
-                 f"MINIMAL ELITE aesthetics for {subject}, sharp volumetric lights bouncing from liquid surfaces.",
-                 f"SARA Style motion: tracking shots through technological portals visualizing the massive {subject} revolution."
+            "hook": f"Is {sub} honestly a gamble? Or are you just lacking the Dominator Blueprint? 🧬",
+            "script": f"Industry veterans won't reveal the true catalyst behind {sub} success. It's not about saturation; it's about calibrated distribution. What 15 years taught us is built into this workflow. Stop thinking—start commanding your niche architecture today.",
+            "caption": f"Global Sovereignty Protocol for {sub}. Phase 1 Activated. 🌍🦾 \n {' '.join(niche_tags[1])}",
+            "visuals": [
+                f"9x16 VERTICAL PRO-GRADE: Close focus on {sub} mastery, cinematic grading, extreme sharpness.",
+                "MOTION GRAPH 4K: Dark atmospheric transition effects visualizing the core of subject dominance.",
+                "VEO3 CINEMA: Tracking masterclasses lighting style, center weighted, minimal elements focus."
             ]
         }
-
     return payload
 
 @app.route("/")
-def index():
+def home():
     return render_template("index.html")
 
 @app.route("/v1/session", methods=["GET"])
 def get_session():
-    uid = "DOMX_" + secrets.token_hex(4).upper()
+    uid = "DOM-MVP-" + secrets.token_hex(4).upper()
     return jsonify({"creator_id": uid})
 
 @app.route("/v1/build-pack", methods=["POST"])
 def build_pack():
-    data = request.json
-    subject = data.get("subject", "Alpha Growth")
-    lang = data.get("lang", "en")
-    
-    # تحرك ذكي: نظام توليد حي، لا قالب مصفوف
-    result = generate_strategic_narrative(subject, lang)
-    
-    return jsonify({
-        "status": "Generating Viral DNA...",
-        "pack": result
-    })
+    try:
+        data = request.json
+        subject = data.get("subject", "Strategy Execution")
+        lang = data.get("lang", "en")
+        raw_out = analyze_niche_dna(subject, lang)
+        return jsonify({"pack": raw_out})
+    except:
+        return jsonify({"error": "System Crash Core-709"}), 500
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
