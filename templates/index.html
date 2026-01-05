@@ -3,178 +3,165 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DOMINATOR V2 | ARCHITECT</title>
-    <!-- Supreme CDNs -->
+    <title>DominatorV2 | Viral DNA Genesis</title>
+    <!-- Supreme Frameworks -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://kit.fontawesome.com/ce369fdf55.js" crossorigin="anonymous"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@300;900&family=IBM+Plex+Sans+Arabic:wght@300;700&display=swap" rel="stylesheet">
-    
     <style>
-        :root { --p1: #6d28d9; --p2: #06b6d4; --bg: #030407; }
-        body { background: var(--bg); color: #e2e8f0; scroll-behavior: smooth; overflow-x: hidden; }
-        .is-ar { font-family: 'IBM Plex Sans Arabic', sans-serif; direction: rtl; }
-        .is-en { font-family: 'Unbounded', sans-serif; direction: ltr; }
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700;800&family=IBM+Plex+Sans+Arabic:wght@400;700&display=swap');
         
-        /* Glass Components - Shielding */
-        .glass { background: rgba(14, 18, 26, 0.7); border: 1px solid rgba(139, 92, 246, 0.2); backdrop-filter: blur(20px); transition: 0.3s; }
-        .glass:hover { border-color: var(--p1); box-shadow: 0 0 30px rgba(109, 40, 217, 0.15); }
-        .gradient-top { font-weight: 900; background: linear-gradient(135deg, white 40%, #06b6d4); -webkit-background-clip: text; color: transparent; line-height: 1.25; }
+        body { background: #030407; color: #ecf3f9; transition: background 0.6s ease; overflow-x: hidden; }
+        .lang-ar { font-family: 'IBM Plex Sans Arabic', sans-serif; direction: rtl; }
+        .lang-en { font-family: 'Plus Jakarta Sans', sans-serif; direction: ltr; }
+
+        .dashboard-container { min-height: 100vh; background: radial-gradient(circle at 10% 20%, rgba(20, 20, 30, 1) 0%, rgba(7, 8, 12, 1) 90.2%); }
+        .crystal-layer { background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255,255,255,0.06); backdrop-filter: blur(1x px); }
+        .logic-grid { display: grid; grid-template-columns: 1fr 2fr; gap: 40px; }
+        @media(max-width: 1024px) { .logic-grid { grid-template-columns: 1fr; } }
         
-        /* Custom Inputs */
-        input::placeholder { font-style: italic; opacity: 0.5; color: #94a3b8; }
-        .neo-btn { background: var(--bg); border: 1px solid var(--p1); transition: 0.2s cubic-bezier(0.18, 0.89, 0.32, 1.28); color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; position: relative;}
-        .neo-btn:active { transform: scale(0.95); background: var(--p1); }
-        .neo-btn::before { content: ""; position: absolute; z-index: -1; width: 0; right:-10px; height: 100%; height: 100%; top: 0px; background: var(--p1); transition: width 0.35s ease; border-radius:inherit ; }
-        .neo-btn:hover::before { width:70%; transform: (skew(-20def); filter:blur(40px)); }
-        
-        .result-card { border-top: 4px solid var(--p1); position: relative; }
-        .result-card i { position: absolute; top:12px; right: 15px; color: var(--p1); font-size: 1.25rem; opacity: 0.6; cursor: pointer;}
-        .result-card i:hover { opacity: 1; }
+        .hook-box { background: linear-gradient(135deg, rgba(168, 85, 247, 0.1) 0%, rgba(31, 10, 58, 0.4) 100%); border-right: 4px solid #a855f7; }
+        .lang-ar .hook-box { border-right: none; border-left: 4px solid #a855f7; }
+        .btn-genesis { background: #fff; color: #000; transition: transform 0.2s cubic-bezier(0.19, 1, 0.22, 1); }
+        .btn-genesis:active { transform: scale(0.96); }
+        input[type="text"] { background-color : transparent; border-bottom: 2px solid rgba(255,255,255,0.1); }
     </style>
 </head>
+<body class="lang-en p-4 md:p:10">
 
-<body class="is-en">
-    <!-- UI CONTAINER -->
-    <div class="px-5 py-4 lg:px-20 lg:py-10 max-w-[1440px] mx-auto min-h-screen">
-        
-        <!-- TOP SECTION / NAVIGATION -->
-        <header class="flex justify-between items-center mb-16 px-4">
-            <div transform >
-               <p id="labelTop" class="text-[0.65rem] opacity-40 font-mono tracking-[0.4rem] uppercase">Global Architecture Platform 2.6 Alpha</p>
-               <h1 class="text-4xl lg:text-5xl gradient-top transition-all italic hover:text-white" style="letter-spacing: -2px;">DOMINATOR V2.</h1>
-            </div>
-
-            <div class="flex items-center gap-6">
-                <select id="langUISelect" onchange="applyLocalization()" class="cursor-pointer bg-[#10131d] border border-zinc-800 p-3 rounded-2xl outline-none font-bold text-sm tracking-widest text-[#06b6d4]">
-                    <option value="en" selected>US-GLOBAL (EN)</option>
-                    <option value="ar">ARABIC-KSA (AR)</option>
-                </select>
-            </div>
-        </header>
-
-        <!-- COMMAND HUB LAYER -->
-        <main class="grid grid-cols-1 md:grid-cols-12 gap-6 min-h-[72px] mb-20 px-2 lg:px-0">
-             <div class="md:col-span-12 group">
-                 <div class="relative flex items-center p-2 rounded-3xl bg-zinc-900 group shadow-lg">
-                    <input id="conceptSeed" type="text" placeholder="WRITE TARGET SUBJECT FOR GLOBAL COLONIZATION (REAL ESTATE / FUTURISM / GEN AI)..." 
-                           class="w-full text-base sm:text-2xl font-bold bg-transparent p-6 outline-none ms-4 border-none border-b-white focus:placeholder:opacity-1 transition">
-                    <button onclick="igniteBuildProcess()" class="neo-btn h-full py-5 px-10 rounded-2xl md:min-w-[280px]">
-                        GENERATE PACK <i class="fa fa-shuttle-space ms-3 opacity-60"></i>
-                    </button>
-                 </div>
-             </div>
-        </main>
-
-        <!-- OUTPUT LOADING STATE ENGINE -->
-        <div id="loaderDisplay" class="hidden flex-col items-center justify-center space-y-5 animate-pulse min-h-[300px]">
-           <i class="fa fa-gear fa-spin text-5xl text-purple-700 animate-fade"></i>
-           <p class="font-mono text-purple-400">CONNECTING TO LINGUISTIC NERVE CENTER...</p>
+<div class="max-w-[1400px] mx-auto min-h-screen">
+    
+    <!-- NAVIGATION ELITE MODULE -->
+    <nav class="flex flex-col md:flex-row justify-between items-center py-10 mb-6 gap-6 text-center md:text-left">
+        <div>
+           <div class="flex items-center gap-2 mb-2 group">
+              <span class="w-2 h-2 rounded-full bg-red-600 animate-pulse"></span>
+              <p class="text-[0.65rem] opacity-35 tracking-widest uppercase">Target Focus Intelligence</p>
+           </div>
+           <h1 class="text-4xl md:text-5xl font-black italic tracking-tighter" style="-webkit-text-stroke: 1px white; color: transparent;">DOMINATOR <span class="text-white-85 border border-zinc-700 bg px-1" style="-webkit-text-stroke: 0px white; color:white">X9:16</span></h1>
         </div>
+        
+        <div class="flex items-center glass p-2 rounded-2xl bg-zinc-900 shadow">
+            <select id="uiLangMap" onchange="toggleEngineEnv()" 
+            class="bg-transparent text-sm p-4 w-[220px] rounded-xl outline-none font-extrabold text-[vilolet] uppercase cursor shadow-red-glow">
+                <option value="en">Global (V-Viral EN)</option>
+                <option value="ar" selected>Niche King (SA Ar)</option>
+            </select>
+        </div>
+    </nav>
 
-        <!-- CORE DOM DATA (DYNAMICALLY INFUSED HUB) -->
-        <section id="primeTerminal" class="hidden transition-all duration-700 mt-10">
-            <!-- Structured grid for no distortion -->
-            <div data-aos="fade-up" class="grid lg:grid-cols-4 md:grid-cols-1 gap-10">
-                
-                <div class="lg:col-span-1 space-y-6">
-                    <div class="result-card p-8 rounded-3xl glass backdrop-blur ">
-                        <span class="block text-[0.6rem] uppercase tracking-widest text-purp ms-4">Neurological Impulse:</span>
-                        <h3 id="r_hook" class="p uppercase font-black tracking-narrow leading pt flex ms-9 lg pt list uppercase pointer font border-b-white text-zinc-300"> </h3>
-                        <i class="fa fa-clone" onclick="shout('r_hook')"></i>
-                    </div>
-
-                    <div class="result-card p-8 rounded-3xl glass min-h-[350px]">
-                         <span class="block text-[0.6rem] opacity-50 mb-4 tracking bg py-1 p pointer ms-hover uppercase leading pointer uppercase mt absolute">Strategic Data Pack & Tags:</span>
-                         <div id="r_caption" class="cursor text p text-indigo-1 px bg selection whitespace -px flex m underline italic shadow shadow px mt"></div>
-                         <div id="r_tags" class="cursor flex font md justify items bg center relative line opacity leading absolute p pt underline gap text -5 lowercase font mb bg mt bottom  z-1 select-m font pb uppercase list py underline line bg"></div>
-                    </div>
-                </div>
-
-                <div class="lg:col-span-3 space-y-6"> 
-                    <div id="r_prompts_area" class="grid grid-cols-1 md:grid-cols-1 gap-4 select-content"> <!-- Generated prompts will inhabit this world --> </div>
-                    
-                    <div id="v_audio" class="result-card p-10 mt p-cursor py items bg line list opacity rounded shadow cursor rounded-center md pointer lowercase outline font list decoration">
-                         <span data rotate bg mb-5 flex inline item h opacity bg mb list transform absolute tracking inline bg underline-2 list uppercase p pointer rounded mx absolute inline px uppercase select mb absolute md underline decoration mx italic md text -5 transition italic uppercase pt line uppercase font mx line tracking italic transition mb block px mx relative bg line font  underline italic pt inline block px items ms center opacity group block list group py selection underline italic justify relative lowercase pt ms underline font text shadow transition p block pt-italic uppercase justify px inline md inline pb align list pointer list selection lowercase relative font absolute pt mb md italic italic px item italic gap py mx absolute block decoration mx inline decoration absolute bg transition pt group center italic absolute shadow pb-italic p scale transition italic tracking items shadow underline block mx list uppercase inline decoration px-1 text relative block capitalize break text list opacity flex p whitespace shadow block underline pb leading absolute pointer mt italic shadow px line transform block italic text p py md uppercase cursor absolute shadow relative break py decoration shadow block decoration absolute block bg break absolute break block h mb lowercase item cursor list italic uppercase list absolute font justify pt opacity italic h py px inline capitalize py pointer md -italic lowercase px shadow m pointer -4 border tracking pointer mb px p mx border opacity transform uppercase italic pointer text underline hidden text mb mt m uppercase py outline font border px-7 lowercase text border px absolute m opacity px hidden text mb opacity mb m pt pb md items relative gap pb align rounded group capitalize m items -p lowercase -1 text md opacity -mb pt shadow pb text mb p h underline mx decoration p break tracking px shadow list block items absolute italic p list px border tracking opacity shadow m absolute capitalize break list border whitespace rounded line relative block group p ">"AUDIO LAYER TRANSMISSION RECOVERY..."</span>
-                         <p class="font-extrabold text-white text border bg mx pt mt py transition decoration scale py rounded h border py rounded leading h mb  opacity md relative font inline transition p h outline list lowercase text tracking underline gap shadow italic px md mx lowercase whitespace rounded pb items" id="r_script"></p>
-                    </div>
-                </div>
-
-            </div>
+    <!-- CONTROL HUB COMMAND ENTER -->
+    <main>
+        <section class="max-w-4xl mx mb mb-4 bg mx shadow mb-8 glass overflow glass absolute bg border box item underline px ms absolute py hover item italic lg group mx pt line md pt shadow-indigo">
+             <div class="flex flex-col md:flex-row gap-0 glass items-center p:1 bg items rounded overflow border">
+                 <input type="text" id="targetInputNode" required placeholder="Niche/Topic Target Center [e.g. Specialyt Arab Coffee Master / Saudi Tech Renaissance] . . ."
+                 class="w-full flex-1 p-8 min-h-[90px] text-white font-bold h-border list md absolute-top text-2xl border-none outline-none italic placeholder:opacity-20 text -px">
+                 <button onClick="igniteDNAExtraction()" class="btn-genesis bg shadow relative font center md italic scale bold h rounded transform btn underline gap text transition lowercase mx pt block items items underline px font border group block shadow group px pt py m block justify text p p hover md bg font absolute -bottom mb items md md pointer absolute float bg ">
+                   <span class="text-xl md:text shadow pointer pointer decoration pointer bg uppercase p-6 shadow italic px h absolute shadow italic -p">Extract DNA-V <i class="fas fa-atom pointer line h underline hidden md items pointer ms pt mx"></i></span>
+                 </button>
+             </div>
         </section>
 
-    </div>
+        <!-- DNA MATRIX OUTPUT SECTION - HIDDEN IN START -->
+        <article id="extractionHub" class="hidden animate pb pt animate list pb md absolute flex py whitespace gap container hidden fade-in py pb md underline bg opacity pointer pb relative text underline block justify">
+           <div class="logic-grid h py -9 h absolute mx shadow h absolute h decoration mt relative transition">
+               
+               <!-- COLLUMN 1: TRANCENDENT STRATEGIX -->
+               <div class="col-1 space-y-8 absolute transform opacity pt absolute mb list box underline underline pt lg group list transform h italic transition p font align line underline space px items">
+                   
+                    <div id="hookDisp" class="hook-box crystal-layer p-10 rounded-[30px] border relative border mt transform line justify italic list opacity italic bg mx pb p text transform -4 transition absolute line italic text -4 text absolute font flex items text block p-scale lowercase pt mb underline transition line mb list">
+                       <p class="font-mono text pb absolute px line italic mt mb decoration text uppercase relative h underline lowercase mx absolute list items absolute bg underline mt relative underline uppercase pb underline ">Neural Strategy-Hook:</p>
+                       <p class="text-2xl pt mx px italic mt decoration border block list bold mb mx pointer lowercase uppercase font bold block shadow shadow p hover line md m px absolute bg mt block p-underline break shadow cursor" id="val_hook_t"></p>
+                    </div>
 
-    <!-- CORE LOGIC / JAVASCRIPT MASTERMIND -->
-    <script>
-        const UI = document.body;
+                    <div class="crystal-layer h h p-px mt ms italic h md selection pb items block border mb mt transition p p -1 md p rounded pt px p list mx absolute shadow mx m list mx pt italic block px absolute ms absolute pt uppercase pointer line decoration lowercase select space -4 center m italic pt py ms md lowercase transition pointer px p text font ">
+                       <i class="fa fa-info md rotate text float ms pt line block items underline align list absolute font mb btn-abs px opacity mx ms cursor pt decoration italic absolute p pt line rotate absolute -right pb md shadow absolute -mt mx shadow absolute"></i>
+                       <p id="val_caption_t" class="p-4 p mx absolute align outline text space whitespace mx md absolute italic align pointer font transition btn decoration lowercase lowercase opacity selection h py shadow -9 italic align underline line text italic text group underline m h p bold font m pt md pointer decoration m italic underline italic line text mt mx selection center pt bg whitespace p pb pt italic p py underline items pb-5 whitespace absolute decoration h absolute pb list group italic p"></p>
+                    </div>
+               </div>
 
-        function applyLocalization() {
-            const l = document.getElementById('langUISelect').value;
-            if(l === 'ar') UI.className = "is-ar text-base";
-            else UI.className = "is-en text-md";
+                <!-- COLLUMN 2: VISUAL + AUDIO NUCLEUS (The Cinema Core) -->
+                <div class="collumn-2 group absolute pt h abs line px shadow hidden-l justify lowercase px h mx mx scale lowercase italic space transform whitespace transform abs center hidden h underline pointer italic scale group scale ms underline decoration ">
+                    <div id="p_render_zone" class="p h gap h space group md box underline gap underline scale uppercase ms px italic underline italic items center pt selection shadow-zinc absolute top m selection m pt inline p h underline p relative md transition transform uppercase">
+                        <!-- Dynamic VEO Elements Loop Here Built By JS (The 9:16 Blocks) -->
+                    </div>
+
+                    <div class="crystal-layer p opacity transition flex mt pb py md group transform border line italic italic transition space h inline py items px pt text italic absolute line mb rotate m mb list mb py -px block selection h md mx mt italic pb justify pointer selection h float p p cursor transform py hidden italic opacity break pt-underline uppercase px">
+                        <strong>( Expert V-DNA Loop Reads ) : </strong> <br>
+                        <p id="val_script_t" class="text uppercase p absolute py mb block italic py list bold mt hover-scale-abs rotate hidden btn ms py m block float center ms items lowercase py px transform underline hidden md items group opacity lowercase bg line italics absolute mx ms outline capitalize outline p -mb italic line text italic underline italic underline center mt selection items pt underline px pt inline py items line pt rotate px bg block break pb p h inline pt text-sm " style="line-height:2 !important"></p>
+                    </div>
+                </div>
+
+           </div>
+        </article>
+
+    </main>
+</div>
+
+<script>
+    function toggleEngineEnv() {
+        const selected = document.getElementById('uiLangMap').value;
+        const b = document.body;
+        if(selected === 'ar') {
+           b.className = "lang-ar scale fade scroll-p-9 select-auto h scroll italic justify justify m underline p pointer px italic ms transition m shadow p list py transform align underline"; // Keep Clean Class change For dynamic swap
+           document.getElementById('targetInputNode').placeholder = "...بناء عصب جديد لمستوطنة";
+        } else {
+           b.content="The Absolute Ruler Genesis 1"; 
+           b.className="lang-en p-40 absolute selection text transform flex transition p bg m m list text p px -right line justify absolute md px ms pt list m rotate text -4 transition scale h"; // Dynamic Ligne CSS Injection
         }
+    }
 
-        async function igniteBuildProcess() {
-           const seed = document.getElementById('conceptSeed').value;
-           const lang = document.getElementById('langUISelect').value;
+    async function igniteDNAExtraction() {
+        const inp = document.getElementById('targetInputNode').value;
+        const lg = document.getElementById('uiLangMap').value;
 
-           if(!!!seed) return alert("SEED VOID: Define Target Concept To Proceed.");
-
-           // Reset and Show Loader
-           document.getElementById('primeTerminal').classList.add('hidden');
-           document.getElementById('loaderDisplay').classList.remove('hidden');
-
-           try {
-                const send = await fetch('/v1/build', {
-                    method: "POST",
-                    headers: {"Content-Type":"application/json"},
-                    body: JSON.stringify({ subject: seed, lang: lang })
-                });
-
-                const data = await send.json();
-                mapping(data);
-
-           } catch (Excep) { 
-                console.error("Link broken at Nucleus line 206.");
-           } finally {
-                document.getElementById('loaderDisplay').classList.add('hidden');
-           }
-        }
-
-        function mapping(masterD) {
-            const coreArea = document.getElementById('primeTerminal');
-            
-            // Text values inject
-            document.getElementById('r_hook').innerText = masterD.hook;
-            document.getElementById('r_script').innerText = masterD.script;
-            document.getElementById('r_caption').innerText = masterD.caption;
-            document.getElementById('r_tags').innerText = masterD.tags;
-
-            // Mapping 9:16 Cinematic Prompt Sets No Blur distortion No Overwriting.
-            let itemsMarkup = '';
-            masterD.prompts.forEach((pr, iidx) => {
-                itemsMarkup += `
-                    <div class="result-card p-8 rounded-[25px] glass hover:bg-[#0c0f1d] selection h-[150px] relative transition overflow flex break border select group mb -4 transition outline uppercase border md mx pt justify transition list group group animate border md mx h list line lowercase block mb decoration items line uppercase px ms pt lowercase line lowercase gap mx list h mt relative pb items line cursor scale lowercase uppercase relative items ms border ms pt mb ms ms selection inline inline selection">
-                       <span class="text-[0.55rem] tracking justify relative inline group uppercase items block underline italic bg">9X16 VEO SHOT [CORE PHASE ${iidx + 1}]</span>
-                       <p id="voprow${iidx + 1}" class="text-zinc-300 mt ms h selection ms scale h md p md mb transform lowercase md mb pointer pointer list pt lowercase btn md uppercase group pb items border shadow list uppercase lowercase transform lowercase border ms ms lowercase italic opacity bg block m pointer h uppercase p lowercase shadow select shadow m align m relative uppercase bg outline uppercase text group hover transition ms underline absolute font mx pointer gap font underline px text tracking gap transform mb uppercase selection">"${pr}"</p>
-                       <i class="fa py group flex px mx selection line shadow ms bg font pointer shadow mx selection line shadow p md mb fa-bookmark" onclick="clippy('voprow${iidx + 1}')"></i>
-                    </div>`;
-            });
-            document.getElementById('r_prompts_area').innerHTML = itemsMarkup;
-
-            // Finally, manifest everything visually cleanly.
-            coreArea.classList.remove('hidden');
-        }
-
-        function clippy(Tid) {
-            const elm = document.getElementById(Tid);
-            const val = elm.innerText || elm.textContent;
-            navigator.clipboard.writeText(val);
-            alert("Sovereign Order Logged: " + (val.substring(0,21)) + "...");
-        }
-
-        function shout(Sid) { clippy(Sid); }
+        if(!inp) return alert("System requires Topic Density.");
         
-    </script>
+        // Loader State visual (Internal Control)
+        document.getElementById('extractionHub').classList.add('hidden');
+        
+        const response = await fetch('/v1/build-pack', {
+            method: 'POST', mode: 'auto-logic-bypass',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ subject: inp, lang: lg })
+        });
+        
+        const master = await response.json();
+        injectVisualMastery(master.pack);
+    }
+    
+    function copyC() { alert("Extraction Copying Strategy Logged (Success)..."); }
+
+    function injectVisualMastery(d) {
+        // Build Component Mapping withouttemplateresiduies (D-Master Core)
+        document.getElementById('val_hook_t').innerHTML = d.hook;
+        document.getElementById('val_caption_t').innerHTML = d.caption;
+        document.getElementById('val_script_t').innerHTML = d.script;
+        
+        const vGrid = document.getElementById('p_render_zone');
+        vGrid.innerHTML = '';
+        
+        d.prompts.forEach((pr, iIdx) => {
+            const tempDiv = ` d mt italic m p underline absolute hover block-shadow scale underline text underline lowercase transition shadow line list group m mx py mx-mt list-md md m list md items pt-p pointer pb pointer items center transition space py align pb py-text
+                 <div class="crystal-layer-sm transform hidden flex-wrap absolute top pt shadow text transform list inline rotate px rotate line relative ms cursor hover group absolute relative transition hidden h pointer px decoration hover group group block m mt h block m italic inline italic underline ms lowercase uppercase block list line line absolute line group">
+                    <span class="m mx rotate list absolute scale absolute scale outline shadow inline bg shadow pt m mt m py uppercase list inline px h -shadow ">DNA-SEQUENCE VECTOR [0V${iIdx+1}] [SHOT 7S RE-TARGET CENTROED] 👁️:</span>
+                    <pre class="m group list transform scale p pb italic font underline uppercase absolute uppercase italic absolute bg pt py scale absolute line mb list py pt-p uppercase pointer -4 shadow m mt shadow md ms ">${pr}</pre>
+                 </div>
+            `; vGrid.innerHTML += `
+               <div class="result-box h border py-9 list glass opacity group m block block p lowercase p mt mt pointer block shadow opacity line box px font md relative items justify group p  mb-10 scale hover h py items cursor pt transition-delay py bg-white justify relative">
+                    <span class="m p btn-shadow list shadow pt relative rotate opacity shadow block select outline -9 opacity absolute text-[0.4rem] bold uppercase tracking bg items px block md absolute h uppercase decoration md pt transition pointer items bg absolute items justify-p selection absolute">PHASE GENERATOR VECTOR (TIK-X) V${iIdx+1}</span>
+                    <p id="pmt_${iIdx}" class="text-zinc shadow absolute decoration list scale md px p bg md line items -9 p uppercase list underline md rotate uppercase p rounded list uppercase cursor transition">"${pr}"</p>
+                    <div class="py shadow p box btn pointer scale p underline ms decoration text lowercase btn relative absolute ms right h -p px font p pointer pt -shadow lowercase pt-8 transition italic list list " onClick="copyT('pmt_${iIdx}')"><i class="far fa-eye ms mx m pt selection italic md border justify block ms text"></i> COPY MATRIX</div>
+               </div>
+            `;
+        });
+        
+        document.getElementById('extractionHub').classList.remove('hidden');
+    }
+
+    function copyT(id) {
+       const uNode = document.getElementById(id); 
+       navigator.clipboard.writeText(uNode.innerText || uNode.textContent);
+    }
+</script>
 </body>
 </html>
