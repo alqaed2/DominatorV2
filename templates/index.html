@@ -1,166 +1,73 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DominatorV2 | Niche DNA Synthesis</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;700&family=IBM+Plex+Sans+Arabic:wght@400;700&display=swap" rel="stylesheet">
-    <style>
-        body { background-color: #030405; color: #eceff4; scroll-behavior: smooth; }
-        .lang-ar { font-family: 'IBM Plex Sans Arabic', sans-serif; direction: rtl; }
-        .lang-en { font-family: 'Unbounded', sans-serif; direction: ltr; }
-        .glass box { background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); transition: 0.3s; }
-        .accent-cyan { color: #00ecff; }
-        .btn-dominator { background: #00ecff; color: #000; box-shadow: 0 0 15px rgba(0, 236, 255, 0.3); transition: transform 0.2s, background 0.2s; }
-        .btn-dominator:hover { transform: scale(0.98); background: #ffffff; }
-        .card-wrapper { border-top: 3px solid #00ecff; }
-        .copy-tag { cursor: pointer; color: #535a6b; font-size: 0.9em; transition: 0.2s: }
-        .copy-tag:hover { color: #00ecff; }
-    </style>
-</head>
-<body class="lang-en p-4 md:p-10">
+import os
+import secrets
+from flask import Flask, render_template, request, jsonify
 
-<div class="max-w-7xl mx-auto min-h-screen">
-    
-    <!-- HEADER BOX : TOP IDENTITY -->
-    <header class="flex flex-col md:flex-row justify-between items-center mb-16 border-b border-zinc-800 pb-10">
-        <div class="brand">
-            <span class="text-[0.6rem] bg-cyan-900 border border-cyan-500/40 text-cyan-400 font-bold px-3 py-1 rounded inline-block mb-3">SYSTEM ONLINE VER_2.9.DNA</span>
-            <h1 class="text-4xl md:text-5xl font-black italic tracking-tighter" style="-webkit-text-stroke: 1px#555; color: white;">DOMX <span class="bg-cyan-500 text-black px-1" style="-webkit-text-stroke: 0px underline;">9:16</span></h1>
-        </div>
+app = Flask(__name__)
+# جدار الحماية للجلسات البرمجية
+app.secret_key = os.environ.get("FLASK_SECRET", secrets.token_hex(32))
 
-        <div class="controls mt-6 md:mt-0 flex gap-4">
-             <select id="lang_ctrl" class="bg-transparent border border-zinc-700 font-bold p-3 rounded-xl outline-none text-zinc-400 focus:border-cyan-500">
-                <option value="en">US / GLOBAL ENGLISH</option>
-                <option value="ar" selected>KSA / بالعربية</option>
-             </select>
-        </div>
-    </header>
+def niche_intelligence_distillery(subject, lang):
+    """محرك تصفير المسافة بين التوقع المليوني للترند والتنفيذ النصي"""
+    s = subject.lower().strip()
+    # 🧬 Dynamic Keyword Sentinel
+    if any(q in s for q in ["اقتصاد", "تجارة", "بيزنس", "أموال", "business", "market", "trade"]):
+        viral_tags_pool = ["#اقتصاد_المنطقة", "#Alpha_Money_VIB", "#سوق_الأجانب", "#أتمتة_الثروة"] if lang=="ar" else ["#WealthHack", "#MarketPulse", "#ProfitDNA", "#ScalingFast"]
+        script_style = "High Fidelity Wealth Logic"
+    elif any(q in s for q in ["ذكاء", "ai", "تقنية", "روبوت", "saudi", "vision"]):
+         viral_tags_pool = ["#منصة_المستقبل", "#مواكبي_العصر", "#تقنيات_التتفيذ", "#ذكاء_أخلاقي"] if lang=="ar" else ["#NeuralFuture", "#AI_Dominance", "#VisionaryTech", "#CyberPulse"]
+         script_style = "Accelerated Techno-Thriller"
+    else: 
+         viral_tags_pool = ["#TrendDNA", "#MarketLeap", "#GrowthHack", "#NextMillionView"]
+         script_style = "Abstract Trend Psychology"
 
-    <!-- CONTENT GENERATION PANEL -->
-    <main class="mb-10 lg:px-20">
-        <div class="bg-zinc-900 /40 p-1 border-2 border-zinc-800 rounded-[35px] grid grid-cols-1 md:grid-cols-12 gap-2 shadow-2xl">
-            <input id="contextSeed" type="text" placeholder="WRITE TARGET NICHE-NAME OR TOPIC CENTER..."
-            class="md:col-span-12 font p-8 h-full bg selection italic glass mb flex rounded bg border md md m uppercase pointer md mx md selection md col-span-9 p-8 bg-transparent text-xl font-bold italic outline-none flex tracking h w-3 hover justify text items justify center mt selection absolute group opacity h bg line 1 font italic p opacity bg items md p">
-            <!-- Reset custom styles in the direct HTML and using Pure TailW to avoid past issues -->
-            <input type="text" id="seed" class="md:col-span-9 bg-transparent p-6 sm:p-8 text-2xl font-bold opacity font border-none italic text-blue-200" placeholder="Type Specific Niche (E.g. Luxury Finance)"></input>
-            <button onclick="igniteEngine()" 
-            class="md:col-span-3 bg-cyan-500 text-black k cursor underline px absolute p text cursor flex text transform m -4 scale justify mx absolute col-span-12 text block shadow uppercase h bg center items underline pt underline -mb decoration py absolute block line rotate p line m absolute pt justify pointer b py bold bg font h items underline ms 9 md pointer list rotate italic hover bg absolute ms h pt ms px text pointer decoration shadow underline relative items transition font m shadow text bold p italic shadow ms shadow font underline items gap ms h transform px pt pb italic selection md p pt relative mx block text transition py selection h pb uppercase shadow text items font p ms mx center bg group block shadow lowercase uppercase pb justify selection transition bg btn-dominator px-10 py-5 rounded-[30px] font-black uppercase tracking-widest sm:text-lg">BUILD DNA <i class="fa fa-shuttle-space"></i></button>
-        </div>
-    </main>
+    hashtags = " ".join(viral_tags_pool)
 
-    <!-- LOADER STATE EFFECT -->
-    <div id="loadingUI" class="hidden flex-col items-center justify-center p-20 animate-pulse text-zinc-600">
-        <div class="h-2 w-24 bg-cyan-500 mb-4 rounded px bg opacity group shadow group justify decoration border underline mt justify m px py bg mx 3 pointer -2 cursor -6 line items pointer uppercase decoration whitespace px h 8 hover text rounded"></div>
-        <p class="font-mono text-cyan-300 font-bold">ANALYZING TREND GENETICS...</p>
-    </div>
-
-    <!-- REFINED UNMATCHED RESULT SYSTEM -->
-    <div id="masterBoard" class="hidden animate pb pt animate list pb md absolute flex py whitespace gap container hidden grid lg:grid-cols-4 gap-8">
-        
-        <!-- SIDE ACTIONS COLL >> ARABIC STICKS RIGHT IF MODIFIED -->
-        <article class="lg border border transition col-span-1 border space-y-7 italic italic justify line items py block ">
-             <div class="bg-zinc-900 /1 md border shadow p rounded-3xl min h p item pointer whitespace underline italic list selection select p border px absolute list mt rounded p italic border relative transform italic tracking-wide group pt-mb items shadow pointer h shadow italic mb italic pointer border absolute cursor px pt list shadow md underline font-sm">
-                <span class="text-[0.6rem] transition h uppercase pointer center underline absolute tracking block inline absolute opacity m p underline-2 relative -right mb color p justify group block underline h underline line select px inline line list px justify select lowercase py px py underline underline p select">NEURAL BOUTIQUE HOOK (15Y Mastery)</span>
-                <p id="r_hook" class="mx text-cyan pt mb font flex text h underline pb group selection hover inline scale uppercase mt block bg transition bg pt ms m pt hidden h absolute mb rotate absolute italic relative select line absolute lowercase whitespace h pt bold md italic border items selection px p center italic py py italic uppercase text transform inline inline p pt mb inline 3 italic py font inline px list mt underline lg underline justify font italic p transform bg transform items list hidden scale mx inline m block pt underline tracking justify justify line block italic inline transition"></p> 
-                <button onclick="copie('r_hook')" class="mt pb absolute absolute-bottom hover transition right color ms items -7 mb py line absolute whitespace mb italic rotate transform m px absolute py absolute selection mx line block bold pointer h border shadow inline decoration mt items rotate text">Copy <i class="fa h shadow items pointer md absolute list decoration hidden pointer"></i></button>
-             </div>
-        </article>
-
-    </div>
-
-</div>
-
-<script>
-    // FIX FOR DISPLAY ISSUES !! THE FULL STABLE UI RENDER ENGINE
-    const bodyEnv = (lSpec) => { document.body.className = lSpec === 'ar' ? 'lang-ar p-4 md:p:10' : 'lang-en p-4 md:p:10'; };
-    bodyEnv('ar'); // Init AR structure as desired.
-
-    async function igniteEngine() {
-        // Logic cleanup and variable safety
-        const nidBox = document.getElementById('seed');
-        const lKey = document.getElementById('lang_ctrl').value;
-        const topID = nidBox.value || "Strategic Control" ; 
-
-        const loadingPanel = document.getElementById('loadingUI');
-        const rsGrid = document.querySelector('#masterBoard');
-        
-        // Setup State
-        loadingPanel.classList.remove('hidden');
-        rsGrid.classList.add('hidden', 'grid'); // Re-enable grid spacing cleanly
-        
-        try {
-            const sendCmd = await fetch('/v1/build-pack', {
-                method: 'POST', mode: 'auto-logic-bypass',
-                headers: {'Content-Type' : 'application/json'},
-                body: JSON.stringify({ subject: topID, lang: lKey })
-            });
-            const dOutcome = await sendCmd.json();
-            bodyEnv(lKey); // Refresh Dir.
-            renderDominance(dOutcome.pack);
-        } catch(Ex) { console.error("Link Fatal Crash."); } finally  { loadingPanel.classList.add('hidden') ; }
+    # لغة صناعة الجواهر لكل نيش
+    ar_templates = {
+        "h": [f"السؤال الصعب للعام الحالي: هل سينجو مشروع {subject} الخاص بك؟ 🌋", f"لماذا الجميع يتجنب الحقيقة المحرجة حول {subject}؟ سأخبرك بها بعبارتين. 🧐"],
+        "c": [f"تحليل الـ DNA المتوحش لمستجدات الـ {subject}. المستقبل يكتب بالجرأة فقط.", f"من عمق الميدان وليس من الورق؛ إليكم حزمة السعي المهني لـ {subject}. ابعد المشككين عن طريقك."]
     }
 
-    function renderDominance(p) {
-        const board = document.getElementById('masterBoard');
-        board.classList.remove('hidden');
+    if lang == "ar":
+        hook = secrets.choice(ar_templates["h"])
+        caption = f"{secrets.choice(ar_templates['c'])} \n\n {hashtags}"
+        script = f"استمع جيداً... الخارق ليس المحتوى المكرر، بل الشفرة الجينية DNA لإيقاع الـ {subject}. الصناعة تبحث الآن عن (تأثير الندرة)، وكل حرف نخرجه الآن مصمم لاختراق انقسام الاهتمام اللحظي. ابدأ بالتنفيذ قبل البراعة... الهيمنة قادمة بجدارة."
+        vis = [
+            f"V-Scene 01: [Deeper Zoom - Kinetic] Micro-details of {subject} textures reacting to dark futuristic biolights.",
+            f"V-Scene 02: [Panoramic - Flow] Wide vertical lens tracking a high-tech city pulse focus on {subject} identity.",
+            f"V-Scene 03: [Interface - Centered] Digital transparent maps charting the viral growth of {subject} systemically."
+        ]
+    else:
+        # English Neural Engine Core
+        hook = f"Everyone is debating {subject}... but only 1% are actually executing correctly. Watch why. 📊"
+        caption = f"Building the Sovereign Asset for {subject}. Step into the grid. 🦾🧬\n {hashtags}"
+        script = f"Strategy bypass in PROGRESS. In the niche where {subject} thrives, ordinary is an ERROR message. We have calibrated the output for high frequency algorithmic feedback. From now, your identity is not just talk; you are an architect of the trend environment itself."
+        vis = [
+            f"VEOPROMPT-9x16-EPIC: Macro lens focus on core material components of {subject}, cinematic smoke atmosphere.",
+            f"CYBERPUNK SHOT: Silhouette of an operator looking into the future of {subject} with neon ray accents.",
+            f"MINIMAL 88: Rapid artistic edits visualizing the cellular core of the {subject} market shift."
+        ]
 
-        // Professional Segment Displaying no overlap mechanism!
-        let v_segments = '';
-        p.visuals.forEach((vTxt, iV) => {
-            v_segments += ` 
-            <div class="result-box bg-zinc-900 /80 p-6 md p rounded-2xl md border group space-y-3 cursor-pointer hover:border-cyan-500 scale transition p items list items group absolute gap underline underline items">
-                 <div class="flex select italic lg align shadow underline group px ms absolute p px absolute mx pt h text h hidden lowercase px opacity whitespace underline gap list pointer rotate uppercase h px transform items uppercase pointer underline p transition md py items p underline selection text float center transform px shadow list list pt shadow lowercase py mx cursor absolute float text items transition -6 uppercase shadow relative shadow">
-                     <span class="text-[0.6rem] justify lg opacity transition opacity bg decoration underline h gap block border p list inline py block border inline item italic pointer pb pt font underline list rotate lowercase items whitespace pointer list text block border rounded items align pb absolute items items relative block list absolute line pt p mx selection transition line absolute inline tracking list -p line pt mx decoration btn underline transition -mb btn p lowercase whitespace italic underline p">MASTER VIDEO SEQUENCE GEN (9x16) POINT_${iV+1}</span>
-                 </div>
-                 <p class="text-indigo w font md h hover scale absolute mt italic outline transform px mt italic box relative underline inline underline decoration italics px py p bg decoration list color flex group gap border items whitespace md scale lowercase lowercase pb transition px center" id="v_shot_${iV}">"${vTxt}"</p>
-                 <span onclick="copie('v_shot_${iV}')" class="text-xs h transition items space list px p hidden shadow-zinc center select-auto selection py font tracking gap h px whitespace underline border text pointer py list mt italic">K_ID_CLCOPY Matrix <i class="far fa-objects-column shadow border m ms px pt h hover pointer group decoration"></i></span>
-            </div>
-          `;
-        }); // OVERREWRITE INJECTOR logic and clean container grid rebuild:
-        
-        board.innerHTML = `
-            <div class="lg:col-span-1 space-y-6">
-                <!-- LEft Core Actions STICKY NO OVERLAP -->
-                <div class="p-8 border card-wrapper bg-[#112] rounded-3xl relative backdrop">
-                    <label class="text-[11px] block text-cyan-500 uppercase font-black space tracking bg absolute -9 bottom italic p p decoration p shadow m transform italic h inline block mx">Expert Script Engine - HOOK</label>
-                    <p class="text-[1.35rem] selection p md pointer h absolute opacity bold center group bold md float pt mb underline hover whitespace align list italic -sm items mb list mx shadow shadow mb px m block rotate pointer italic ms italic h mb font bg mx bold mx align px bg px shadow text relative mb list capitalize leading items select py lowercase italic italic h m opacity shadow mb pb italic md mt 7 transition lowercase absolute opacity justify pointer list lowercase select p cursor h p mt selection group ms m block line" id="finalHook">${p.hook}</p>
-                    <button onclick="copie('finalHook')" class="mt-80 -mt selection btn-1 pointer color -3 p m absolute transform transition float scale py lowercase transform lowercase mx bold md list -p selection mb p tracking transition mb text opacity italics block p -sm opacity select-text gap btn lowercase text border h h uppercase btn h items btn shadow mt cursor -0 pt h opacity h block px"> <i class="far fa-star absolute shadow border mx text shadow pt group shadow-l rotate -z bg selection align gap cursor list inline rounded h rounded scale mx bg px mx hover gap italic px border p line decoration list mb"></i> Copy Hook Analysis </button>
-                </div>
-                
-                 <div class="p-8 mt cursor ms lg p bg-[#14151a] shadow -1 md list rounded outline italic item mb font underline -lg underline italic rotate group p lowercase md list absolute underline pb inline rotate scale opacity p items list selection italic justify italic relative line-relaxed italic transform md underline px lowercase md 3 border pointer italic pb items absolute -mt hidden scale decoration items p float pt tracking p mt m relative pointer ms underline px pointer shadow shadow-box box-border h pt-5 absolute rounded-3xl font relative line px absolute" id="capPack">
-                    <p id="fCap" class="font md decoration line pointer transform opacity mx font transition inline opacity absolute hidden decoration rounded py inline mx md px p list block tracking inline font mb line -sm mx selection float outline color select mx item pt border mt relative lowercase shadow decoration italic underline block group pt outline line h transform py ms md h list px italic border md center 4 transform mx items whitespace px p mt align tracking justify pt pointer transition h uppercase md pointer pointer float py space h hover px btn items hidden list bold pb h items gap group float outline gap md center pt align uppercase relative block underline pb inline transform mx mt space px px pointer h whitespace h mt line transform block whitespace hidden select decoration uppercase bold p items decoration list rotate absolute whitespace italic outline block mt m transition p mx px px transition md scale h items md italic shadow pt pointer relative btn list-relaxed decoration outline tracking cursor list tracking 4 selection inline p select opacity break absolute 7 relative uppercase md underline shadow-indigo px mt whitespace rounded 7 md space inline underline px hidden opacity group underline shadow whitespace space tracking whitespace inline italic m pb m 1 italic capitalize transform scale line p mb italic bold transform mb px inline font opacity">** Strategic Tags: ** <br> ${p.caption}</p>
-                </div>
-            </div>
+    return {"hook": hook, "script": script, "caption": caption, "vis": vis}
 
-            <div class="lg:col-span-3 space-y-8 absolute transform opacity pt absolute mb list box underline underline pt lg group list transform h italic transition p font align line underline space px items">
-                <main class="grid pointer pb grid-cols-1 md px hidden p-9 ms outline decoration scale mt relative list underline absolute uppercase opacity-scale pb gap px items item transition lowercase relative align lg tracking pt px uppercase shadow float mx outline border-zinc border absolute lowercase pt relative scale selection border list inline line italic space hidden scale -p opacity h list shadow transform transition border pointer cursor p transition m absolute h px btn shadow list -right transition h group selection rotate mt md inline m justify rotation absolute transition italic inline opacity group hidden lg transition grid justify mt gap-6 relative select-node relative absolute -indigo pb whitespace md pointer md pb group pt group bg mx block border px cursor ">
-                   ${v_segments}
-                </main>
-                 <!-- REDUNDANT WRAPPER FIX (Clean code forced for next renders to hold everything tight: -->
-                <div class="dna_matrix scale border ms bg block center absolute top transition -space opacity relative p whitespace transform box decoration space inline bg-emerald group mx ms flex border line block line block decoration rounded line float p italic mt h decoration pt center p p list lowercase select border selection lowercase inline px lowercase pointer cursor underline lowercase justify pb pt scale p rounded-lg-fix block rounded p text shadow block uppercase text italics outline break text opacity px hidden italic 2 md mx m px font pt bg selection p m -4 rounded selection rotate h md h shadow rotate selection block rounded underline ms p font scale selection h italic inline line hover selection px absolute absolute">
-                   ${v_segments}
-                </div> 
+@app.route("/")
+def index():
+    return render_template("index.html")
 
-                <div class="result-box w glass hidden selection text ms group selection scale items color bg p shadow items p underline pb absolute 8 cursor outline mb whitespace justify md flex mb align selection shadow line m px h center selection relative selection gap rotate transition list selection mb -italic hover shadow m m bg list absolute scale lowercase border list inline cursor opacity bg m transition block line justify whitespace list m px px outline pt transition shadow shadow uppercase bg mx shadow-0 h md shadow scale ms lowercase text scale opacity selection text m mb bg opacity -3 opacity justify p ms pt italic selection transform p block float text block group border font px decoration md mx absolute line h ms border 3 inline block px underline rotate uppercase scale ms md float group pt lowercase underline line m pointer list align ms shadow decoration bold inline -6 shadow text mx transition shadow mx -3 justify list select pt mb rounded shadow">
-                    <p class="h bg -4 italic selection mb absolute 7 h italic transition block transform underline line shadow pt transform italic opacity h italic selection transition whitespace line relative inline h md mb lowercase shadow pt ms font pb italic border pt text font leading underline tracking gap -mt font -p relative whitespace outline font p p opacity align list rounded underline gap absolute italic p 8 opacity hidden text mb px m capitalize block align selection m opacity italic transition h transition items decoration mx italic shadow 7 mt bold leading h -4 pb list rotation md block opacity italic border mx px pb justify transform uppercase m decoration 1 shadow mb inline mb rotation pb ms absolute capitalize ms outline selection font 0 mb underline capitalize underline capitalize line group selection h rotation hover justify py group decoration relative decoration px text tracking opacity -3 item lowercase opacity-1 opacity italic tracking center list space 3 justify-around underline px mt px border select ms 1 transition italic block underline absolute shadow underline line ms h md item pb-1 absolute pt line h bg decoration md h underline decoration pb italic inline px mb decoration p cursor px hover px" style="line-height:2.4; padding:2rem 0;">"${p.script}"</p>
-                </div>
+@app.route("/v1/session")
+def session_reg():
+    return jsonify({"creator_id": "DOMX-" + secrets.token_hex(5).upper()})
 
-            </div>
-        `;
-    }
+@app.route("/v1/generate", methods=["POST"])
+def build_engine():
+    data = request.json
+    try:
+        subject = data.get("subject", "Viral Strategy").strip()
+        lang = data.get("lang", "en")
+        outcome = niche_intelligence_distillery(subject, lang)
+        return jsonify({"success": True, "data": outcome})
+    except:
+        return jsonify({"success": False, "msg": "Nucleur Logic Error"}), 500
 
-    function copie(Tidd) {
-           const eItem = document.getElementById(Tidd);
-           if(eItem){
-            navigator.clipboard.writeText(eItem.innerText || eItem.textContent )
-            .then( () => alert("Sovereign Target Synced (Copy Finish)") )
-            .catch( () => alert("Buffer error - Restart Brain Engine") );
-           }
-    }
-</script>
-
-</body>
-</html>
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
