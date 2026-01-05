@@ -3,165 +3,164 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DominatorV2 | Viral DNA Genesis</title>
-    <!-- Supreme Frameworks -->
+    <title>DominatorV2 | Niche DNA Synthesis</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://kit.fontawesome.com/ce369fdf55.js" crossorigin="anonymous"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;700&family=IBM+Plex+Sans+Arabic:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700;800&family=IBM+Plex+Sans+Arabic:wght@400;700&display=swap');
-        
-        body { background: #030407; color: #ecf3f9; transition: background 0.6s ease; overflow-x: hidden; }
+        body { background-color: #030405; color: #eceff4; scroll-behavior: smooth; }
         .lang-ar { font-family: 'IBM Plex Sans Arabic', sans-serif; direction: rtl; }
-        .lang-en { font-family: 'Plus Jakarta Sans', sans-serif; direction: ltr; }
-
-        .dashboard-container { min-height: 100vh; background: radial-gradient(circle at 10% 20%, rgba(20, 20, 30, 1) 0%, rgba(7, 8, 12, 1) 90.2%); }
-        .crystal-layer { background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255,255,255,0.06); backdrop-filter: blur(1x px); }
-        .logic-grid { display: grid; grid-template-columns: 1fr 2fr; gap: 40px; }
-        @media(max-width: 1024px) { .logic-grid { grid-template-columns: 1fr; } }
-        
-        .hook-box { background: linear-gradient(135deg, rgba(168, 85, 247, 0.1) 0%, rgba(31, 10, 58, 0.4) 100%); border-right: 4px solid #a855f7; }
-        .lang-ar .hook-box { border-right: none; border-left: 4px solid #a855f7; }
-        .btn-genesis { background: #fff; color: #000; transition: transform 0.2s cubic-bezier(0.19, 1, 0.22, 1); }
-        .btn-genesis:active { transform: scale(0.96); }
-        input[type="text"] { background-color : transparent; border-bottom: 2px solid rgba(255,255,255,0.1); }
+        .lang-en { font-family: 'Unbounded', sans-serif; direction: ltr; }
+        .glass box { background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); transition: 0.3s; }
+        .accent-cyan { color: #00ecff; }
+        .btn-dominator { background: #00ecff; color: #000; box-shadow: 0 0 15px rgba(0, 236, 255, 0.3); transition: transform 0.2s, background 0.2s; }
+        .btn-dominator:hover { transform: scale(0.98); background: #ffffff; }
+        .card-wrapper { border-top: 3px solid #00ecff; }
+        .copy-tag { cursor: pointer; color: #535a6b; font-size: 0.9em; transition: 0.2s: }
+        .copy-tag:hover { color: #00ecff; }
     </style>
 </head>
-<body class="lang-en p-4 md:p:10">
+<body class="lang-en p-4 md:p-10">
 
-<div class="max-w-[1400px] mx-auto min-h-screen">
+<div class="max-w-7xl mx-auto min-h-screen">
     
-    <!-- NAVIGATION ELITE MODULE -->
-    <nav class="flex flex-col md:flex-row justify-between items-center py-10 mb-6 gap-6 text-center md:text-left">
-        <div>
-           <div class="flex items-center gap-2 mb-2 group">
-              <span class="w-2 h-2 rounded-full bg-red-600 animate-pulse"></span>
-              <p class="text-[0.65rem] opacity-35 tracking-widest uppercase">Target Focus Intelligence</p>
-           </div>
-           <h1 class="text-4xl md:text-5xl font-black italic tracking-tighter" style="-webkit-text-stroke: 1px white; color: transparent;">DOMINATOR <span class="text-white-85 border border-zinc-700 bg px-1" style="-webkit-text-stroke: 0px white; color:white">X9:16</span></h1>
+    <!-- HEADER BOX : TOP IDENTITY -->
+    <header class="flex flex-col md:flex-row justify-between items-center mb-16 border-b border-zinc-800 pb-10">
+        <div class="brand">
+            <span class="text-[0.6rem] bg-cyan-900 border border-cyan-500/40 text-cyan-400 font-bold px-3 py-1 rounded inline-block mb-3">SYSTEM ONLINE VER_2.9.DNA</span>
+            <h1 class="text-4xl md:text-5xl font-black italic tracking-tighter" style="-webkit-text-stroke: 1px#555; color: white;">DOMX <span class="bg-cyan-500 text-black px-1" style="-webkit-text-stroke: 0px underline;">9:16</span></h1>
         </div>
+
+        <div class="controls mt-6 md:mt-0 flex gap-4">
+             <select id="lang_ctrl" class="bg-transparent border border-zinc-700 font-bold p-3 rounded-xl outline-none text-zinc-400 focus:border-cyan-500">
+                <option value="en">US / GLOBAL ENGLISH</option>
+                <option value="ar" selected>KSA / بالعربية</option>
+             </select>
+        </div>
+    </header>
+
+    <!-- CONTENT GENERATION PANEL -->
+    <main class="mb-10 lg:px-20">
+        <div class="bg-zinc-900 /40 p-1 border-2 border-zinc-800 rounded-[35px] grid grid-cols-1 md:grid-cols-12 gap-2 shadow-2xl">
+            <input id="contextSeed" type="text" placeholder="WRITE TARGET NICHE-NAME OR TOPIC CENTER..."
+            class="md:col-span-12 font p-8 h-full bg selection italic glass mb flex rounded bg border md md m uppercase pointer md mx md selection md col-span-9 p-8 bg-transparent text-xl font-bold italic outline-none flex tracking h w-3 hover justify text items justify center mt selection absolute group opacity h bg line 1 font italic p opacity bg items md p">
+            <!-- Reset custom styles in the direct HTML and using Pure TailW to avoid past issues -->
+            <input type="text" id="seed" class="md:col-span-9 bg-transparent p-6 sm:p-8 text-2xl font-bold opacity font border-none italic text-blue-200" placeholder="Type Specific Niche (E.g. Luxury Finance)"></input>
+            <button onclick="igniteEngine()" 
+            class="md:col-span-3 bg-cyan-500 text-black k cursor underline px absolute p text cursor flex text transform m -4 scale justify mx absolute col-span-12 text block shadow uppercase h bg center items underline pt underline -mb decoration py absolute block line rotate p line m absolute pt justify pointer b py bold bg font h items underline ms 9 md pointer list rotate italic hover bg absolute ms h pt ms px text pointer decoration shadow underline relative items transition font m shadow text bold p italic shadow ms shadow font underline items gap ms h transform px pt pb italic selection md p pt relative mx block text transition py selection h pb uppercase shadow text items font p ms mx center bg group block shadow lowercase uppercase pb justify selection transition bg btn-dominator px-10 py-5 rounded-[30px] font-black uppercase tracking-widest sm:text-lg">BUILD DNA <i class="fa fa-shuttle-space"></i></button>
+        </div>
+    </main>
+
+    <!-- LOADER STATE EFFECT -->
+    <div id="loadingUI" class="hidden flex-col items-center justify-center p-20 animate-pulse text-zinc-600">
+        <div class="h-2 w-24 bg-cyan-500 mb-4 rounded px bg opacity group shadow group justify decoration border underline mt justify m px py bg mx 3 pointer -2 cursor -6 line items pointer uppercase decoration whitespace px h 8 hover text rounded"></div>
+        <p class="font-mono text-cyan-300 font-bold">ANALYZING TREND GENETICS...</p>
+    </div>
+
+    <!-- REFINED UNMATCHED RESULT SYSTEM -->
+    <div id="masterBoard" class="hidden animate pb pt animate list pb md absolute flex py whitespace gap container hidden grid lg:grid-cols-4 gap-8">
         
-        <div class="flex items-center glass p-2 rounded-2xl bg-zinc-900 shadow">
-            <select id="uiLangMap" onchange="toggleEngineEnv()" 
-            class="bg-transparent text-sm p-4 w-[220px] rounded-xl outline-none font-extrabold text-[vilolet] uppercase cursor shadow-red-glow">
-                <option value="en">Global (V-Viral EN)</option>
-                <option value="ar" selected>Niche King (SA Ar)</option>
-            </select>
-        </div>
-    </nav>
-
-    <!-- CONTROL HUB COMMAND ENTER -->
-    <main>
-        <section class="max-w-4xl mx mb mb-4 bg mx shadow mb-8 glass overflow glass absolute bg border box item underline px ms absolute py hover item italic lg group mx pt line md pt shadow-indigo">
-             <div class="flex flex-col md:flex-row gap-0 glass items-center p:1 bg items rounded overflow border">
-                 <input type="text" id="targetInputNode" required placeholder="Niche/Topic Target Center [e.g. Specialyt Arab Coffee Master / Saudi Tech Renaissance] . . ."
-                 class="w-full flex-1 p-8 min-h-[90px] text-white font-bold h-border list md absolute-top text-2xl border-none outline-none italic placeholder:opacity-20 text -px">
-                 <button onClick="igniteDNAExtraction()" class="btn-genesis bg shadow relative font center md italic scale bold h rounded transform btn underline gap text transition lowercase mx pt block items items underline px font border group block shadow group px pt py m block justify text p p hover md bg font absolute -bottom mb items md md pointer absolute float bg ">
-                   <span class="text-xl md:text shadow pointer pointer decoration pointer bg uppercase p-6 shadow italic px h absolute shadow italic -p">Extract DNA-V <i class="fas fa-atom pointer line h underline hidden md items pointer ms pt mx"></i></span>
-                 </button>
+        <!-- SIDE ACTIONS COLL >> ARABIC STICKS RIGHT IF MODIFIED -->
+        <article class="lg border border transition col-span-1 border space-y-7 italic italic justify line items py block ">
+             <div class="bg-zinc-900 /1 md border shadow p rounded-3xl min h p item pointer whitespace underline italic list selection select p border px absolute list mt rounded p italic border relative transform italic tracking-wide group pt-mb items shadow pointer h shadow italic mb italic pointer border absolute cursor px pt list shadow md underline font-sm">
+                <span class="text-[0.6rem] transition h uppercase pointer center underline absolute tracking block inline absolute opacity m p underline-2 relative -right mb color p justify group block underline h underline line select px inline line list px justify select lowercase py px py underline underline p select">NEURAL BOUTIQUE HOOK (15Y Mastery)</span>
+                <p id="r_hook" class="mx text-cyan pt mb font flex text h underline pb group selection hover inline scale uppercase mt block bg transition bg pt ms m pt hidden h absolute mb rotate absolute italic relative select line absolute lowercase whitespace h pt bold md italic border items selection px p center italic py py italic uppercase text transform inline inline p pt mb inline 3 italic py font inline px list mt underline lg underline justify font italic p transform bg transform items list hidden scale mx inline m block pt underline tracking justify justify line block italic inline transition"></p> 
+                <button onclick="copie('r_hook')" class="mt pb absolute absolute-bottom hover transition right color ms items -7 mb py line absolute whitespace mb italic rotate transform m px absolute py absolute selection mx line block bold pointer h border shadow inline decoration mt items rotate text">Copy <i class="fa h shadow items pointer md absolute list decoration hidden pointer"></i></button>
              </div>
-        </section>
-
-        <!-- DNA MATRIX OUTPUT SECTION - HIDDEN IN START -->
-        <article id="extractionHub" class="hidden animate pb pt animate list pb md absolute flex py whitespace gap container hidden fade-in py pb md underline bg opacity pointer pb relative text underline block justify">
-           <div class="logic-grid h py -9 h absolute mx shadow h absolute h decoration mt relative transition">
-               
-               <!-- COLLUMN 1: TRANCENDENT STRATEGIX -->
-               <div class="col-1 space-y-8 absolute transform opacity pt absolute mb list box underline underline pt lg group list transform h italic transition p font align line underline space px items">
-                   
-                    <div id="hookDisp" class="hook-box crystal-layer p-10 rounded-[30px] border relative border mt transform line justify italic list opacity italic bg mx pb p text transform -4 transition absolute line italic text -4 text absolute font flex items text block p-scale lowercase pt mb underline transition line mb list">
-                       <p class="font-mono text pb absolute px line italic mt mb decoration text uppercase relative h underline lowercase mx absolute list items absolute bg underline mt relative underline uppercase pb underline ">Neural Strategy-Hook:</p>
-                       <p class="text-2xl pt mx px italic mt decoration border block list bold mb mx pointer lowercase uppercase font bold block shadow shadow p hover line md m px absolute bg mt block p-underline break shadow cursor" id="val_hook_t"></p>
-                    </div>
-
-                    <div class="crystal-layer h h p-px mt ms italic h md selection pb items block border mb mt transition p p -1 md p rounded pt px p list mx absolute shadow mx m list mx pt italic block px absolute ms absolute pt uppercase pointer line decoration lowercase select space -4 center m italic pt py ms md lowercase transition pointer px p text font ">
-                       <i class="fa fa-info md rotate text float ms pt line block items underline align list absolute font mb btn-abs px opacity mx ms cursor pt decoration italic absolute p pt line rotate absolute -right pb md shadow absolute -mt mx shadow absolute"></i>
-                       <p id="val_caption_t" class="p-4 p mx absolute align outline text space whitespace mx md absolute italic align pointer font transition btn decoration lowercase lowercase opacity selection h py shadow -9 italic align underline line text italic text group underline m h p bold font m pt md pointer decoration m italic underline italic line text mt mx selection center pt bg whitespace p pb pt italic p py underline items pb-5 whitespace absolute decoration h absolute pb list group italic p"></p>
-                    </div>
-               </div>
-
-                <!-- COLLUMN 2: VISUAL + AUDIO NUCLEUS (The Cinema Core) -->
-                <div class="collumn-2 group absolute pt h abs line px shadow hidden-l justify lowercase px h mx mx scale lowercase italic space transform whitespace transform abs center hidden h underline pointer italic scale group scale ms underline decoration ">
-                    <div id="p_render_zone" class="p h gap h space group md box underline gap underline scale uppercase ms px italic underline italic items center pt selection shadow-zinc absolute top m selection m pt inline p h underline p relative md transition transform uppercase">
-                        <!-- Dynamic VEO Elements Loop Here Built By JS (The 9:16 Blocks) -->
-                    </div>
-
-                    <div class="crystal-layer p opacity transition flex mt pb py md group transform border line italic italic transition space h inline py items px pt text italic absolute line mb rotate m mb list mb py -px block selection h md mx mt italic pb justify pointer selection h float p p cursor transform py hidden italic opacity break pt-underline uppercase px">
-                        <strong>( Expert V-DNA Loop Reads ) : </strong> <br>
-                        <p id="val_script_t" class="text uppercase p absolute py mb block italic py list bold mt hover-scale-abs rotate hidden btn ms py m block float center ms items lowercase py px transform underline hidden md items group opacity lowercase bg line italics absolute mx ms outline capitalize outline p -mb italic line text italic underline italic underline center mt selection items pt underline px pt inline py items line pt rotate px bg block break pb p h inline pt text-sm " style="line-height:2 !important"></p>
-                    </div>
-                </div>
-
-           </div>
         </article>
 
-    </main>
+    </div>
+
 </div>
 
 <script>
-    function toggleEngineEnv() {
-        const selected = document.getElementById('uiLangMap').value;
-        const b = document.body;
-        if(selected === 'ar') {
-           b.className = "lang-ar scale fade scroll-p-9 select-auto h scroll italic justify justify m underline p pointer px italic ms transition m shadow p list py transform align underline"; // Keep Clean Class change For dynamic swap
-           document.getElementById('targetInputNode').placeholder = "...بناء عصب جديد لمستوطنة";
-        } else {
-           b.content="The Absolute Ruler Genesis 1"; 
-           b.className="lang-en p-40 absolute selection text transform flex transition p bg m m list text p px -right line justify absolute md px ms pt list m rotate text -4 transition scale h"; // Dynamic Ligne CSS Injection
-        }
+    // FIX FOR DISPLAY ISSUES !! THE FULL STABLE UI RENDER ENGINE
+    const bodyEnv = (lSpec) => { document.body.className = lSpec === 'ar' ? 'lang-ar p-4 md:p:10' : 'lang-en p-4 md:p:10'; };
+    bodyEnv('ar'); // Init AR structure as desired.
+
+    async function igniteEngine() {
+        // Logic cleanup and variable safety
+        const nidBox = document.getElementById('seed');
+        const lKey = document.getElementById('lang_ctrl').value;
+        const topID = nidBox.value || "Strategic Control" ; 
+
+        const loadingPanel = document.getElementById('loadingUI');
+        const rsGrid = document.querySelector('#masterBoard');
+        
+        // Setup State
+        loadingPanel.classList.remove('hidden');
+        rsGrid.classList.add('hidden', 'grid'); // Re-enable grid spacing cleanly
+        
+        try {
+            const sendCmd = await fetch('/v1/build-pack', {
+                method: 'POST', mode: 'auto-logic-bypass',
+                headers: {'Content-Type' : 'application/json'},
+                body: JSON.stringify({ subject: topID, lang: lKey })
+            });
+            const dOutcome = await sendCmd.json();
+            bodyEnv(lKey); // Refresh Dir.
+            renderDominance(dOutcome.pack);
+        } catch(Ex) { console.error("Link Fatal Crash."); } finally  { loadingPanel.classList.add('hidden') ; }
     }
 
-    async function igniteDNAExtraction() {
-        const inp = document.getElementById('targetInputNode').value;
-        const lg = document.getElementById('uiLangMap').value;
+    function renderDominance(p) {
+        const board = document.getElementById('masterBoard');
+        board.classList.remove('hidden');
 
-        if(!inp) return alert("System requires Topic Density.");
-        
-        // Loader State visual (Internal Control)
-        document.getElementById('extractionHub').classList.add('hidden');
-        
-        const response = await fetch('/v1/build-pack', {
-            method: 'POST', mode: 'auto-logic-bypass',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ subject: inp, lang: lg })
-        });
-        
-        const master = await response.json();
-        injectVisualMastery(master.pack);
-    }
-    
-    function copyC() { alert("Extraction Copying Strategy Logged (Success)..."); }
-
-    function injectVisualMastery(d) {
-        // Build Component Mapping withouttemplateresiduies (D-Master Core)
-        document.getElementById('val_hook_t').innerHTML = d.hook;
-        document.getElementById('val_caption_t').innerHTML = d.caption;
-        document.getElementById('val_script_t').innerHTML = d.script;
-        
-        const vGrid = document.getElementById('p_render_zone');
-        vGrid.innerHTML = '';
-        
-        d.prompts.forEach((pr, iIdx) => {
-            const tempDiv = ` d mt italic m p underline absolute hover block-shadow scale underline text underline lowercase transition shadow line list group m mx py mx-mt list-md md m list md items pt-p pointer pb pointer items center transition space py align pb py-text
-                 <div class="crystal-layer-sm transform hidden flex-wrap absolute top pt shadow text transform list inline rotate px rotate line relative ms cursor hover group absolute relative transition hidden h pointer px decoration hover group group block m mt h block m italic inline italic underline ms lowercase uppercase block list line line absolute line group">
-                    <span class="m mx rotate list absolute scale absolute scale outline shadow inline bg shadow pt m mt m py uppercase list inline px h -shadow ">DNA-SEQUENCE VECTOR [0V${iIdx+1}] [SHOT 7S RE-TARGET CENTROED] 👁️:</span>
-                    <pre class="m group list transform scale p pb italic font underline uppercase absolute uppercase italic absolute bg pt py scale absolute line mb list py pt-p uppercase pointer -4 shadow m mt shadow md ms ">${pr}</pre>
+        // Professional Segment Displaying no overlap mechanism!
+        let v_segments = '';
+        p.visuals.forEach((vTxt, iV) => {
+            v_segments += ` 
+            <div class="result-box bg-zinc-900 /80 p-6 md p rounded-2xl md border group space-y-3 cursor-pointer hover:border-cyan-500 scale transition p items list items group absolute gap underline underline items">
+                 <div class="flex select italic lg align shadow underline group px ms absolute p px absolute mx pt h text h hidden lowercase px opacity whitespace underline gap list pointer rotate uppercase h px transform items uppercase pointer underline p transition md py items p underline selection text float center transform px shadow list list pt shadow lowercase py mx cursor absolute float text items transition -6 uppercase shadow relative shadow">
+                     <span class="text-[0.6rem] justify lg opacity transition opacity bg decoration underline h gap block border p list inline py block border inline item italic pointer pb pt font underline list rotate lowercase items whitespace pointer list text block border rounded items align pb absolute items items relative block list absolute line pt p mx selection transition line absolute inline tracking list -p line pt mx decoration btn underline transition -mb btn p lowercase whitespace italic underline p">MASTER VIDEO SEQUENCE GEN (9x16) POINT_${iV+1}</span>
                  </div>
-            `; vGrid.innerHTML += `
-               <div class="result-box h border py-9 list glass opacity group m block block p lowercase p mt mt pointer block shadow opacity line box px font md relative items justify group p  mb-10 scale hover h py items cursor pt transition-delay py bg-white justify relative">
-                    <span class="m p btn-shadow list shadow pt relative rotate opacity shadow block select outline -9 opacity absolute text-[0.4rem] bold uppercase tracking bg items px block md absolute h uppercase decoration md pt transition pointer items bg absolute items justify-p selection absolute">PHASE GENERATOR VECTOR (TIK-X) V${iIdx+1}</span>
-                    <p id="pmt_${iIdx}" class="text-zinc shadow absolute decoration list scale md px p bg md line items -9 p uppercase list underline md rotate uppercase p rounded list uppercase cursor transition">"${pr}"</p>
-                    <div class="py shadow p box btn pointer scale p underline ms decoration text lowercase btn relative absolute ms right h -p px font p pointer pt -shadow lowercase pt-8 transition italic list list " onClick="copyT('pmt_${iIdx}')"><i class="far fa-eye ms mx m pt selection italic md border justify block ms text"></i> COPY MATRIX</div>
-               </div>
-            `;
-        });
+                 <p class="text-indigo w font md h hover scale absolute mt italic outline transform px mt italic box relative underline inline underline decoration italics px py p bg decoration list color flex group gap border items whitespace md scale lowercase lowercase pb transition px center" id="v_shot_${iV}">"${vTxt}"</p>
+                 <span onclick="copie('v_shot_${iV}')" class="text-xs h transition items space list px p hidden shadow-zinc center select-auto selection py font tracking gap h px whitespace underline border text pointer py list mt italic">K_ID_CLCOPY Matrix <i class="far fa-objects-column shadow border m ms px pt h hover pointer group decoration"></i></span>
+            </div>
+          `;
+        }); // OVERREWRITE INJECTOR logic and clean container grid rebuild:
         
-        document.getElementById('extractionHub').classList.remove('hidden');
+        board.innerHTML = `
+            <div class="lg:col-span-1 space-y-6">
+                <!-- LEft Core Actions STICKY NO OVERLAP -->
+                <div class="p-8 border card-wrapper bg-[#112] rounded-3xl relative backdrop">
+                    <label class="text-[11px] block text-cyan-500 uppercase font-black space tracking bg absolute -9 bottom italic p p decoration p shadow m transform italic h inline block mx">Expert Script Engine - HOOK</label>
+                    <p class="text-[1.35rem] selection p md pointer h absolute opacity bold center group bold md float pt mb underline hover whitespace align list italic -sm items mb list mx shadow shadow mb px m block rotate pointer italic ms italic h mb font bg mx bold mx align px bg px shadow text relative mb list capitalize leading items select py lowercase italic italic h m opacity shadow mb pb italic md mt 7 transition lowercase absolute opacity justify pointer list lowercase select p cursor h p mt selection group ms m block line" id="finalHook">${p.hook}</p>
+                    <button onclick="copie('finalHook')" class="mt-80 -mt selection btn-1 pointer color -3 p m absolute transform transition float scale py lowercase transform lowercase mx bold md list -p selection mb p tracking transition mb text opacity italics block p -sm opacity select-text gap btn lowercase text border h h uppercase btn h items btn shadow mt cursor -0 pt h opacity h block px"> <i class="far fa-star absolute shadow border mx text shadow pt group shadow-l rotate -z bg selection align gap cursor list inline rounded h rounded scale mx bg px mx hover gap italic px border p line decoration list mb"></i> Copy Hook Analysis </button>
+                </div>
+                
+                 <div class="p-8 mt cursor ms lg p bg-[#14151a] shadow -1 md list rounded outline italic item mb font underline -lg underline italic rotate group p lowercase md list absolute underline pb inline rotate scale opacity p items list selection italic justify italic relative line-relaxed italic transform md underline px lowercase md 3 border pointer italic pb items absolute -mt hidden scale decoration items p float pt tracking p mt m relative pointer ms underline px pointer shadow shadow-box box-border h pt-5 absolute rounded-3xl font relative line px absolute" id="capPack">
+                    <p id="fCap" class="font md decoration line pointer transform opacity mx font transition inline opacity absolute hidden decoration rounded py inline mx md px p list block tracking inline font mb line -sm mx selection float outline color select mx item pt border mt relative lowercase shadow decoration italic underline block group pt outline line h transform py ms md h list px italic border md center 4 transform mx items whitespace px p mt align tracking justify pt pointer transition h uppercase md pointer pointer float py space h hover px btn items hidden list bold pb h items gap group float outline gap md center pt align uppercase relative block underline pb inline transform mx mt space px px pointer h whitespace h mt line transform block whitespace hidden select decoration uppercase bold p items decoration list rotate absolute whitespace italic outline block mt m transition p mx px px transition md scale h items md italic shadow pt pointer relative btn list-relaxed decoration outline tracking cursor list tracking 4 selection inline p select opacity break absolute 7 relative uppercase md underline shadow-indigo px mt whitespace rounded 7 md space inline underline px hidden opacity group underline shadow whitespace space tracking whitespace inline italic m pb m 1 italic capitalize transform scale line p mb italic bold transform mb px inline font opacity">** Strategic Tags: ** <br> ${p.caption}</p>
+                </div>
+            </div>
+
+            <div class="lg:col-span-3 space-y-8 absolute transform opacity pt absolute mb list box underline underline pt lg group list transform h italic transition p font align line underline space px items">
+                <main class="grid pointer pb grid-cols-1 md px hidden p-9 ms outline decoration scale mt relative list underline absolute uppercase opacity-scale pb gap px items item transition lowercase relative align lg tracking pt px uppercase shadow float mx outline border-zinc border absolute lowercase pt relative scale selection border list inline line italic space hidden scale -p opacity h list shadow transform transition border pointer cursor p transition m absolute h px btn shadow list -right transition h group selection rotate mt md inline m justify rotation absolute transition italic inline opacity group hidden lg transition grid justify mt gap-6 relative select-node relative absolute -indigo pb whitespace md pointer md pb group pt group bg mx block border px cursor ">
+                   ${v_segments}
+                </main>
+                 <!-- REDUNDANT WRAPPER FIX (Clean code forced for next renders to hold everything tight: -->
+                <div class="dna_matrix scale border ms bg block center absolute top transition -space opacity relative p whitespace transform box decoration space inline bg-emerald group mx ms flex border line block line block decoration rounded line float p italic mt h decoration pt center p p list lowercase select border selection lowercase inline px lowercase pointer cursor underline lowercase justify pb pt scale p rounded-lg-fix block rounded p text shadow block uppercase text italics outline break text opacity px hidden italic 2 md mx m px font pt bg selection p m -4 rounded selection rotate h md h shadow rotate selection block rounded underline ms p font scale selection h italic inline line hover selection px absolute absolute">
+                   ${v_segments}
+                </div> 
+
+                <div class="result-box w glass hidden selection text ms group selection scale items color bg p shadow items p underline pb absolute 8 cursor outline mb whitespace justify md flex mb align selection shadow line m px h center selection relative selection gap rotate transition list selection mb -italic hover shadow m m bg list absolute scale lowercase border list inline cursor opacity bg m transition block line justify whitespace list m px px outline pt transition shadow shadow uppercase bg mx shadow-0 h md shadow scale ms lowercase text scale opacity selection text m mb bg opacity -3 opacity justify p ms pt italic selection transform p block float text block group border font px decoration md mx absolute line h ms border 3 inline block px underline rotate uppercase scale ms md float group pt lowercase underline line m pointer list align ms shadow decoration bold inline -6 shadow text mx transition shadow mx -3 justify list select pt mb rounded shadow">
+                    <p class="h bg -4 italic selection mb absolute 7 h italic transition block transform underline line shadow pt transform italic opacity h italic selection transition whitespace line relative inline h md mb lowercase shadow pt ms font pb italic border pt text font leading underline tracking gap -mt font -p relative whitespace outline font p p opacity align list rounded underline gap absolute italic p 8 opacity hidden text mb px m capitalize block align selection m opacity italic transition h transition items decoration mx italic shadow 7 mt bold leading h -4 pb list rotation md block opacity italic border mx px pb justify transform uppercase m decoration 1 shadow mb inline mb rotation pb ms absolute capitalize ms outline selection font 0 mb underline capitalize underline capitalize line group selection h rotation hover justify py group decoration relative decoration px text tracking opacity -3 item lowercase opacity-1 opacity italic tracking center list space 3 justify-around underline px mt px border select ms 1 transition italic block underline absolute shadow underline line ms h md item pb-1 absolute pt line h bg decoration md h underline decoration pb italic inline px mb decoration p cursor px hover px" style="line-height:2.4; padding:2rem 0;">"${p.script}"</p>
+                </div>
+
+            </div>
+        `;
     }
 
-    function copyT(id) {
-       const uNode = document.getElementById(id); 
-       navigator.clipboard.writeText(uNode.innerText || uNode.textContent);
+    function copie(Tidd) {
+           const eItem = document.getElementById(Tidd);
+           if(eItem){
+            navigator.clipboard.writeText(eItem.innerText || eItem.textContent )
+            .then( () => alert("Sovereign Target Synced (Copy Finish)") )
+            .catch( () => alert("Buffer error - Restart Brain Engine") );
+           }
     }
 </script>
+
 </body>
 </html>
