@@ -5,54 +5,53 @@ from flask import Flask, render_template, request, jsonify
 app = Flask(__name__)
 app.secret_key = secrets.token_hex(32)
 
-def intelligent_niche_fusion(subject, lang):
-    """محرك التحليل العالي الدقة (DNA Extraction Logic)"""
-    s = str(subject).strip() if subject else "General Success"
+def elite_viral_architecture(niche, lang):
+    """محرك فك الشفرة للموضوع المختصر وحساب نغمة الترند اللحظي"""
+    n = niche.strip() if niche else "Alpha Project"
     
-    # تصنيف ذكي للمجال لمنع التداخلات البرمجية
-    # الكلمات المفتاحية تم تنظيفها من أحرف الهروب (Escape Characters)
-    k_biz = ["تجارة", "بزنس", "اقتصاد", "مال", "success", "money", "ثروة"]
-    is_biz = any(k in s.lower() for k in k_biz)
+    # محرك الهاشتاجات التلقائية الذكية المسلح ببيانات القطاع
+    hash_pool = {
+        "biz": ["#ثورة_الأعمال", "#MindsetMagic", "#RiyadhBusiness", "#تداول_التركيز"],
+        "tech": ["#AiDNA2026", "#مستقبل_النماذج", "#SovereignCode", "#TechTrends"],
+        "life": ["#LuxuryMind", "#SaudiExperience", "#VlogLife", "#SpecialtyVibe"]
+    }
     
-    tags = ["#Dominance2026", "#AlphaNiche", "#FutureReady"]
-    
-    if lang == "ar":
-        hook = f"السر خلف نجاح {s} ليس في المجهود، بل في 'الخوارزمية الصامتة' التي تتجاهلها! 🔍"
-        script = (f"كل هؤلاء يدعون أن محتوى {s} سهل التحقيق.. هم يكذبون عليك ليس لحماية المال، بل لحماية السيطرة. "
-                  f"بناء الـ DNA الخاص بصناعة محتواك هنا يتطلب ذكاءً إجرائيًا يتخطى المنافسين بعقود.")
-        caption = f"خطة الهجوم في نيش {s}. السيطرة أو الجمود.. الخيار لك. ✅⚡\n {' '.join(tags)}"
-    else:
-        hook = f"Your competition worships {s} volume, while we worship {s} architecture. Watch. 📊"
-        script = (f"In 2026, mediocrity is terminal. If you scale {s} without technical DNA integration, you fail. "
-                  f"We restructured this protocol for absolute niche conversion. Execute properly.")
-        caption = f"The {s} Domination Manual. Phase One. 🧬🪐\n {' '.join(tags)}"
+    # تحديد النيش ديناميكياً
+    target_key = "biz" if any(x in n.lower() for x in ["مشاركة", "عمارة", "اقتصاد" "money"]) else "tech"
+    active_hashes = " ".join(hash_pool.get(target_key, hash_pool["life"]))
 
-    visuals = [
-        {"id": "V1", "desc": f"POV 9-16 Vertical: 8K Close-up showing {s} elements glowing in cyberpunk void."},
-        {"id": "V2", "desc": f"DRAMATIC TILT: Visualizing the massive structural growth of {s} markets with bokeh."},
-        {"id": "V3", "desc": f"CENTRIC VIEW: Minimalist cinematic shot centering {s} essence for loop retention."}
+    if lang == "ar":
+        hook = f"لماذا الجميع يراقب {n} بصمت وهذ المرة؟ الأمر لم يعد سراً! 👁️"
+        caption = f"خطة الهيمنة المتسلسلة لـ {n}. بناء أنظمتنا يبدأ بكلمة 'إلغاء' للمقاعد القديمة. \n\n {active_hashes}"
+        script = f"استمع جيداً، نجاح {n} المحتمل يتطلب تفاعل الجزيئات السينمائية مع الجمهور الصعب.. نحن في 2026 والجمهور لن يقبل إلا بمعدن القيمة الوفير."
+    else:
+        hook = f"The {n} structure is resetting... Why is now the ultimate entry window? 🗺️"
+        caption = f"The Complete Mastery Manual for {n}. We stop reacting and start dominating the niche loop. \n\n {active_hashes}"
+        script = f"Operational protocol Alpha - Target: {n}. Focus on kinetic movement and focal visual gravity. Results guaranteed by 15yrs experience DNA."
+
+    vis = [
+        f"CLOSE-UP POV (TIKTOK 9:16): Heavy texture shot of {n} in 8K cinematic grain, center-focused.",
+        f"TILT-SHIFT MOTION: A panoramic visual depicting the rapid growth wave of {n} in futuristic tones.",
+        f"AESTHETIC LOOP: A single artistic object revolving about {n} reflecting purple neon lights."
     ]
 
-    return {"hook": hook, "script": script, "caption": caption, "visuals": visuals}
+    return {"hook": hook, "script": script, "caption": caption, "visuals": vis}
 
 @app.route("/")
 @app.route("/dashboard")
-def index():
+def dashboard():
     return render_template("index.html")
 
 @app.route("/v1/build-dna", methods=["POST"])
-def build():
+def build_engine():
     try:
-        data = request.get_json(silent=True)
-        if not data or 'subject' not in data:
-            return jsonify({"success": False, "msg": "Subject Void"}), 400
-        
-        bundle = intelligent_niche_fusion(data['subject'], data.get('lang', 'ar'))
-        return jsonify({"success": True, "results": bundle})
-    except Exception as e:
-        return jsonify({"success": False, "msg": "Infiltration Detected"}), 500
+        data = request.get_json()
+        niche_input = data.get('subject', 'Tech Evolution')
+        lang = data.get('lang', 'ar')
+        result_bundle = elite_viral_architecture(niche_input, lang)
+        return jsonify({"success": True, "bundle": result_bundle})
+    except:
+        return jsonify({"success": False, "msg": "Nucleous Server Failure"}), 500
 
 if __name__ == "__main__":
-    # تشغيل متوافق مع كافة المنصات السحابية
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
