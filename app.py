@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from config import settings
 from db import init_db, SessionLocal
 from models import Job, Pack
-from queue import get_queue
+from rq_queue import get_queue  # ✅ renamed module (avoid stdlib queue collision)
 from tasks import process_build_pack
 from services.trends import get_trending_hashtags
 
@@ -178,8 +178,8 @@ def build_pack():
         if async_enabled and q is None and settings.WORKER_TICK_TOKEN:
             return jsonify(_job_to_dict(job)), 202
 
-        # Case C: fallback sync (for local/dev or if no token)
-        pack_id = process_build_pack(job.id)
+        # Case C: fallback sync
+        process_build_pack(job.id)
         job = db.get(Job, job.id)
         if not job:
             return jsonify({"error": "job_lost"}), 500
@@ -219,7 +219,6 @@ def get_pack(pack_id: str):
 
 
 def _claim_next_job_postgres(db: Session) -> str | None:
-    # Atomically claim a queued job (Postgres only)
     sql = text("""
     WITH next AS (
       SELECT id
@@ -243,7 +242,6 @@ def _claim_next_job_postgres(db: Session) -> str | None:
 
 
 def _claim_next_job_fallback(db: Session) -> str | None:
-    # Fallback (SQLite): best-effort
     stmt = select(Job).where(Job.status == "queued").order_by(Job.created_at.asc()).limit(1)
     job = db.execute(stmt).scalars().first()
     if not job:
@@ -259,7 +257,6 @@ def _claim_next_job_fallback(db: Session) -> str | None:
 
 @app.post("/internal/worker-tick")
 def worker_tick():
-    # SECURITY: require token
     token = request.headers.get("X-Worker-Token") or request.args.get("token")
     if not settings.WORKER_TICK_TOKEN or token != settings.WORKER_TICK_TOKEN:
         return jsonify({"error": "forbidden"}), 403
@@ -276,7 +273,6 @@ def worker_tick():
     try:
         for _ in range(limit):
             job_id = None
-            # Try Postgres atomic claim first
             try:
                 job_id = _claim_next_job_postgres(db)
             except Exception:
@@ -285,7 +281,6 @@ def worker_tick():
             if not job_id:
                 break
 
-            # Process job (this function manages its own DB session)
             process_build_pack(job_id)
             processed.append(job_id)
 
