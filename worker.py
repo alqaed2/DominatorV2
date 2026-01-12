@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-import os
 from rq import Worker, Connection
 
 from config import settings
-from queue import get_redis
+from rq_queue import get_redis  # ✅ renamed module (avoid stdlib queue collision)
 
 # Ensure the task function is importable for RQ
 import tasks  # noqa: F401
