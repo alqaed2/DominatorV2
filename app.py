@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import time
+import threading
 from collections import defaultdict, deque
 from datetime import datetime
 
@@ -13,19 +14,22 @@ from werkzeug.exceptions import HTTPException
 from config import settings
 from db import init_db, SessionLocal
 from models import Job, Pack
-from rq_queue import get_queue  # ✅ renamed module (avoid stdlib queue collision)
+from rq_queue import get_queue
 from tasks import process_build_pack
 from services.trends import get_trending_hashtags
 
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
 
-# --- In-memory rate limiter (upgrade later to Redis-based) ---
 _requests_by_ip: dict[str, deque[float]] = defaultdict(deque)
 
-# --- DB ensure (prevents "tables missing" surprises) ---
+# DB init guard
 _DB_INIT_DONE = False
 _DB_INIT_ERR: str | None = None
+
+# Prevent flooding background threads from this gunicorn worker
+_BG_LOCK = threading.Lock()
+_BG_ACTIVE: set[str] = set()
 
 
 def ensure_db():
@@ -95,10 +99,8 @@ def _pack_to_dict(pack: Pack, job_id: str | None = None) -> dict:
 
 @app.errorhandler(Exception)
 def handle_exception(e):
-    # Keep HTTP errors as-is
     if isinstance(e, HTTPException):
         return e
-    # Return JSON so frontend sees the reason
     return jsonify({"error": "internal_server_error", "detail": str(e)}), 500
 
 
@@ -121,7 +123,6 @@ def readyz():
         db = _db()
         db.execute(select(1))
         db.close()
-        # Try ensure DB schema once (non-fatal if fails here; will show detail)
         try:
             ensure_db()
         except Exception:
@@ -163,7 +164,6 @@ def build_pack():
     payload = request.get_json(silent=True) or {}
     mode = (payload.get("mode") or "niche").lower().strip()
 
-    # Normalize inputs
     if mode == "url":
         input_value = (payload.get("url") or "").strip()
         if not input_value:
@@ -203,16 +203,20 @@ def build_pack():
 
         q = get_queue()
 
-        # Case A: Full async (Redis + Paid Worker exists)
+        # Paid mode (Redis queue + Worker)
         if async_enabled and q is not None:
             q.enqueue("tasks.process_build_pack", job.id)
             return jsonify(_job_to_dict(job)), 202
 
-        # Case B: Free mode async (no worker) -> processed via /internal/worker-tick
+        # Free mode (tick required)
         if async_enabled and q is None and settings.WORKER_TICK_TOKEN:
             return jsonify(_job_to_dict(job)), 202
 
-        # Case C: fallback sync
+        # Safety: do NOT run heavy sync in production if token missing
+        if async_enabled and q is None and not settings.WORKER_TICK_TOKEN:
+            return jsonify({"error": "async_enabled_but_no_tick_token"}), 503
+
+        # Fallback sync (local/dev)
         process_build_pack(job.id)
         job = db.get(Job, job.id)
         if not job:
@@ -291,8 +295,33 @@ def _claim_next_job_fallback(db: Session) -> str | None:
     return job.id
 
 
+def _kick_background(job_id: str) -> bool:
+    # Avoid kicking the same job multiple times in this worker
+    with _BG_LOCK:
+        if job_id in _BG_ACTIVE:
+            return False
+        _BG_ACTIVE.add(job_id)
+
+    def _runner():
+        try:
+            process_build_pack(job_id)
+        finally:
+            with _BG_LOCK:
+                _BG_ACTIVE.discard(job_id)
+
+    t = threading.Thread(target=_runner, name=f"job-{job_id}", daemon=True)
+    t.start()
+    return True
+
+
 @app.post("/internal/worker-tick")
 def worker_tick():
+    """
+    FINAL MODE:
+    - Claim up to N queued jobs atomically
+    - Kick execution in background threads (returns immediately)
+    - Never blocks HTTP request (prevents GitHub timeouts and connection resets)
+    """
     ensure_db()
 
     token = request.headers.get("X-Worker-Token") or request.args.get("token")
@@ -304,9 +333,9 @@ def worker_tick():
         limit = int(limit_raw)
     except Exception:
         limit = 1
-    limit = max(1, min(3, limit))
+    limit = max(1, min(2, limit))  # keep it conservative on free tier
 
-    processed = []
+    kicked = []
     db = _db()
     try:
         for _ in range(limit):
@@ -319,17 +348,16 @@ def worker_tick():
             if not job_id:
                 break
 
-            process_build_pack(job_id)
-            processed.append(job_id)
+            if _kick_background(job_id):
+                kicked.append(job_id)
 
-        return jsonify({"processed": processed, "count": len(processed)}), 200
+        return jsonify({"kicked": kicked, "count": len(kicked)}), 200
     finally:
         db.close()
 
 
-# --- Startup ---
+# Startup
 try:
     ensure_db()
 except Exception:
-    # Don't crash boot; /readyz will show db_init_err
     pass
