@@ -1,0 +1,24 @@
+name: worker-tick
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"  # كل 5 دقائق (GitHub قد يؤخر قليلًا)
+  workflow_dispatch: {}
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call worker tick endpoint
+        env:
+          BASE_URL: ${{ secrets.DOMINATOR_BASE_URL }}
+          TOKEN: ${{ secrets.WORKER_TICK_TOKEN }}
+        run: |
+          if [ -z "$BASE_URL" ] || [ -z "$TOKEN" ]; then
+            echo "Missing secrets: DOMINATOR_BASE_URL or WORKER_TICK_TOKEN"
+            exit 1
+          fi
+          curl -sS -X POST "$BASE_URL/internal/worker-tick?limit=1" \
+            -H "X-Worker-Token: $TOKEN" \
+            -H "Content-Type: application/json"
+          echo ""
