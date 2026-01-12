@@ -341,4 +341,31 @@ def dominance_score(context: dict, genes: dict, assets: dict) -> dict:
         reasons.append("CTA محدد (يقود لفعل واضح).")
 
     # Penalty: too generic
-    generic_words = ["م]()_
+    generic_words = ["مهم", "جداً", "لازم", "ضروري", "أفضل", "مميز"]
+    blob_all = json.dumps(assets, ensure_ascii=False)
+    if sum(1 for w in generic_words if w in blob_all) >= 4:
+        score -= 6
+        reasons.append("يوجد بعض العموميات؛ يمكن زيادة الدقة والأرقام.")
+
+    score = max(0, min(100, score))
+
+    recommendation = "publish" if score >= 75 else ("revise" if score >= 55 else "regenerate")
+
+    if not reasons:
+        reasons = ["مقبول مبدئيًا، لكن يحتاج مزيدًا من التمايز."]
+
+    return {"score": score, "reasons": reasons[:3], "recommendation": recommendation}
+
+
+def _safe_json(text: str) -> dict | None:
+    if not text:
+        return None
+    text = text.strip()
+    # attempt to locate JSON object
+    m = re.search(r"\{.*\}", text, flags=re.S)
+    if m:
+        text = m.group(0)
+    try:
+        return json.loads(text)
+    except Exception:
+        return None
