@@ -6,8 +6,9 @@ from datetime import datetime
 
 from flask import Flask, jsonify, request, render_template
 from jinja2 import TemplateNotFound
-from sqlalchemy import select, text
+from sqlalchemy import select, text, func
 from sqlalchemy.orm import Session
+from werkzeug.exceptions import HTTPException
 
 from config import settings
 from db import init_db, SessionLocal
@@ -19,9 +20,26 @@ from services.trends import get_trending_hashtags
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
 
-
 # --- In-memory rate limiter (upgrade later to Redis-based) ---
 _requests_by_ip: dict[str, deque[float]] = defaultdict(deque)
+
+# --- DB ensure (prevents "tables missing" surprises) ---
+_DB_INIT_DONE = False
+_DB_INIT_ERR: str | None = None
+
+
+def ensure_db():
+    global _DB_INIT_DONE, _DB_INIT_ERR
+    if _DB_INIT_DONE:
+        return
+    try:
+        init_db()
+        _DB_INIT_DONE = True
+        _DB_INIT_ERR = None
+    except Exception as e:
+        _DB_INIT_DONE = False
+        _DB_INIT_ERR = str(e)
+        raise
 
 
 def _rate_limit_ok(ip: str) -> bool:
@@ -43,16 +61,15 @@ def _db() -> Session:
     return SessionLocal()
 
 
-def _count_by_status(db: Session, status: str) -> int:
-    stmt = select(Job).where(Job.status == status)
-    return len(list(db.execute(stmt).scalars().all()))
+def _count_status(db: Session, status: str) -> int:
+    return int(db.scalar(select(func.count()).select_from(Job).where(Job.status == status)) or 0)
 
 
 def _job_to_dict(job: Job) -> dict:
     return {
         "job_id": job.id,
         "status": job.status,
-        "progress": job.progress or 0.0,
+        "progress": float(job.progress or 0.0),
         "pack_id": job.pack_id,
         "error": job.error_message,
     }
@@ -76,6 +93,15 @@ def _pack_to_dict(pack: Pack, job_id: str | None = None) -> dict:
     }
 
 
+@app.errorhandler(Exception)
+def handle_exception(e):
+    # Keep HTTP errors as-is
+    if isinstance(e, HTTPException):
+        return e
+    # Return JSON so frontend sees the reason
+    return jsonify({"error": "internal_server_error", "detail": str(e)}), 500
+
+
 @app.after_request
 def _cors(resp):
     resp.headers["Access-Control-Allow-Origin"] = "*"
@@ -95,7 +121,12 @@ def readyz():
         db = _db()
         db.execute(select(1))
         db.close()
-        return jsonify({"ready": True})
+        # Try ensure DB schema once (non-fatal if fails here; will show detail)
+        try:
+            ensure_db()
+        except Exception:
+            pass
+        return jsonify({"ready": True, "db_init": _DB_INIT_DONE, "db_init_err": _DB_INIT_ERR})
     except Exception as e:
         return jsonify({"ready": False, "error": str(e)}), 503
 
@@ -114,12 +145,15 @@ def index():
 
 @app.get("/v1/trending-hashtags")
 def trending_hashtags():
+    ensure_db()
     tags = get_trending_hashtags(limit=15)
     return jsonify({"hashtags": tags})
 
 
 @app.post("/v1/build-pack")
 def build_pack():
+    ensure_db()
+
     ip = request.headers.get("X-Forwarded-For", request.remote_addr) or "unknown"
     ip = ip.split(",")[0].strip()
 
@@ -153,8 +187,8 @@ def build_pack():
 
     db = _db()
     try:
-        running = _count_by_status(db, "running")
-        queued = _count_by_status(db, "queued")
+        running = _count_status(db, "running")
+        queued = _count_status(db, "queued")
 
         if running >= settings.MAX_CONCURRENT_JOBS:
             return jsonify({"error": "busy", "running": running}), 429
@@ -174,7 +208,7 @@ def build_pack():
             q.enqueue("tasks.process_build_pack", job.id)
             return jsonify(_job_to_dict(job)), 202
 
-        # Case B: Free mode async (no worker) -> leave queued, process via /internal/worker-tick
+        # Case B: Free mode async (no worker) -> processed via /internal/worker-tick
         if async_enabled and q is None and settings.WORKER_TICK_TOKEN:
             return jsonify(_job_to_dict(job)), 202
 
@@ -196,6 +230,7 @@ def build_pack():
 
 @app.get("/v1/jobs/<job_id>")
 def job_status(job_id: str):
+    ensure_db()
     db = _db()
     try:
         job = db.get(Job, job_id)
@@ -208,6 +243,7 @@ def job_status(job_id: str):
 
 @app.get("/v1/packs/<pack_id>")
 def get_pack(pack_id: str):
+    ensure_db()
     db = _db()
     try:
         pack = db.get(Pack, pack_id)
@@ -257,6 +293,8 @@ def _claim_next_job_fallback(db: Session) -> str | None:
 
 @app.post("/internal/worker-tick")
 def worker_tick():
+    ensure_db()
+
     token = request.headers.get("X-Worker-Token") or request.args.get("token")
     if not settings.WORKER_TICK_TOKEN or token != settings.WORKER_TICK_TOKEN:
         return jsonify({"error": "forbidden"}), 403
@@ -291,6 +329,7 @@ def worker_tick():
 
 # --- Startup ---
 try:
-    init_db()
+    ensure_db()
 except Exception:
+    # Don't crash boot; /readyz will show db_init_err
     pass
