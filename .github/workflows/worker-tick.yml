@@ -16,7 +16,7 @@ jobs:
           curl -fsS --max-time 45 "$BASE_URL/healthz" >/dev/null
           echo "Warm-up OK"
 
-      - name: Call worker tick endpoint (fail on non-2xx)
+      - name: Kick jobs (non-blocking)
         env:
           BASE_URL: ${{ secrets.DOMINATOR_BASE_URL }}
           TOKEN: ${{ secrets.WORKER_TICK_TOKEN }}
@@ -26,8 +26,8 @@ jobs:
             exit 1
           fi
 
-          echo "Ticking: $BASE_URL/internal/worker-tick?limit=1"
-          curl -fsS --retry 3 --retry-all-errors --max-time 60 \
+          echo "Kicking: $BASE_URL/internal/worker-tick?limit=1"
+          curl -fsS --max-time 20 \
             -X POST "$BASE_URL/internal/worker-tick?limit=1" \
             -H "X-Worker-Token: $TOKEN" \
             -H "Content-Type: application/json"
