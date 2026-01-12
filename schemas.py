@@ -1,43 +1,42 @@
-from typing import Any, Dict, List, Optional
+from __future__ import annotations
 from pydantic import BaseModel, Field
-
-
-class OnboardRequest(BaseModel):
-    project_name: str = Field(..., min_length=1)
-    niche: str = Field(..., min_length=1)
-    audience: str = Field(..., min_length=1)
-    goal: str = Field(..., min_length=1)
-    platforms: List[str] = Field(default_factory=lambda: ["tiktok", "reels", "shorts"])
-    language: str = Field(default="ar")
-
-
-class DailyBriefRequest(BaseModel):
-    idea: str = Field(..., min_length=1)
-    language: str = Field(default="ar")
+from typing import Any
 
 
 class BuildPackRequest(BaseModel):
-    title: str = Field(..., min_length=1)
-    niche: str = Field(default="")
-    audience: str = Field(default="")
-    language: str = Field(default="ar")
+    mode: str = Field(default="niche", description="niche|url")
+    niche: str | None = None
+    url: str | None = None
+
+    platforms: list[str] = Field(default_factory=lambda: ["linkedin", "x", "tiktok"])
+    language: str = "ar"
+    tone: str = "authority"
+    include_visual: bool = True
+
+    # optional: force sync processing even if async enabled
+    sync: bool = False
 
 
-class SubmitMetricsRequest(BaseModel):
-    session_id: str = Field(..., min_length=8)
-    platform: str = Field(..., min_length=1)
-    content_id: str = Field(..., min_length=1)
-    metrics: Dict[str, Any] = Field(default_factory=dict)
-    ts: Optional[str] = None
+class JobResponse(BaseModel):
+    job_id: str
+    status: str
+    progress: float = 0.0
+    pack_id: str | None = None
+    error: str | None = None
 
 
-class ManualMetricsRequest(SubmitMetricsRequest):
-    """Backward-compatible alias for older clients."""
-    pass
+class PackResponse(BaseModel):
+    pack_id: str
+    job_id: str | None = None
 
+    mode: str
+    input_value: str
+    language: str
+    platforms: list[str]
+    tone: str
 
-class MetricsPoint(BaseModel):
-    ts: str
-    platform: str
-    content_id: str
-    metrics: Dict[str, Any]
+    genes: dict[str, Any] = {}
+    assets: dict[str, Any] = {}
+    visual: dict[str, Any] = {}
+    dominance: dict[str, Any] = {}
+    sources: dict[str, Any] = {}
