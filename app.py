@@ -7,7 +7,7 @@ from datetime import datetime
 
 from flask import Flask, jsonify, request, render_template
 from jinja2 import TemplateNotFound
-from sqlalchemy import select, text, func
+from sqlalchemy import select, func, update
 from sqlalchemy.orm import Session
 from werkzeug.exceptions import HTTPException
 
@@ -23,11 +23,9 @@ app = Flask(__name__, static_folder="static", template_folder="templates")
 
 _requests_by_ip: dict[str, deque[float]] = defaultdict(deque)
 
-# DB init guard
 _DB_INIT_DONE = False
 _DB_INIT_ERR: str | None = None
 
-# Prevent flooding background threads per gunicorn worker
 _BG_LOCK = threading.Lock()
 _BG_ACTIVE: set[str] = set()
 
@@ -46,9 +44,13 @@ def ensure_db():
         raise
 
 
+def _db() -> Session:
+    return SessionLocal()
+
+
 def _rate_limit_ok(ip: str) -> bool:
-    limit = settings.MAX_REQUESTS_PER_IP_PER_MIN
-    if limit <= 0:
+    limit = getattr(settings, "MAX_REQUESTS_PER_IP_PER_MIN", 60)
+    if not limit or limit <= 0:
         return True
     now = time.time()
     window = 60.0
@@ -61,10 +63,6 @@ def _rate_limit_ok(ip: str) -> bool:
     return True
 
 
-def _db() -> Session:
-    return SessionLocal()
-
-
 def _count_status(db: Session, status: str) -> int:
     return int(db.scalar(select(func.count()).select_from(Job).where(Job.status == status)) or 0)
 
@@ -75,7 +73,7 @@ def _job_to_dict(job: Job) -> dict:
         "status": job.status,
         "progress": float(job.progress or 0.0),
         "pack_id": job.pack_id,
-        "error": job.error_message,
+        "error": getattr(job, "error_message", None),
     }
 
 
@@ -151,38 +149,6 @@ def trending_hashtags():
     return jsonify({"hashtags": tags})
 
 
-def _mark_job_running_atomic(db: Session, job_id: str) -> bool:
-    """
-    Atomically move job from queued -> running (prevents duplicate kicks across workers).
-    Works on Postgres; fallback handles others.
-    """
-    try:
-        sql = text("""
-        UPDATE jobs
-        SET status = 'running',
-            started_at = NOW(),
-            updated_at = NOW(),
-            progress = 0.01
-        WHERE id = :id AND status = 'queued'
-        RETURNING id;
-        """)
-        row = db.execute(sql, {"id": job_id}).fetchone()
-        db.commit()
-        return bool(row)
-    except Exception:
-        # fallback: best effort
-        job = db.get(Job, job_id)
-        if not job or job.status != "queued":
-            return False
-        job.status = "running"
-        job.started_at = datetime.utcnow()
-        job.updated_at = datetime.utcnow()
-        job.progress = 0.01
-        db.add(job)
-        db.commit()
-        return True
-
-
 def _kick_background(job_id: str) -> bool:
     with _BG_LOCK:
         if job_id in _BG_ACTIVE:
@@ -201,14 +167,36 @@ def _kick_background(job_id: str) -> bool:
     return True
 
 
+def _atomic_set_running(db: Session, job_id: str) -> bool:
+    """
+    DB-safe atomic transition:
+    queued -> running
+    (لا يعتمد على أسماء جداول نصية، يستخدم ORM مباشرة)
+    """
+    now = datetime.utcnow()
+    stmt = (
+        update(Job)
+        .where(Job.id == job_id, Job.status == "queued")
+        .values(status="running", started_at=now, updated_at=now, progress=0.01)
+    )
+    res = db.execute(stmt)
+    db.commit()
+    return (res.rowcount or 0) == 1
+
+
+def _atomic_claim_oldest_queued(db: Session) -> str | None:
+    """
+    Claim أقدم queued job بشكل متوافق (بدون SQL نصّي).
+    """
+    job_id = db.scalar(select(Job.id).where(Job.status == "queued").order_by(Job.created_at.asc()).limit(1))
+    if not job_id:
+        return None
+    ok = _atomic_set_running(db, job_id)
+    return job_id if ok else None
+
+
 @app.post("/v1/build-pack")
 def build_pack():
-    """
-    FINAL FREE-TIER MODE:
-    - Create job fast
-    - If Redis worker exists -> enqueue
-    - Else (free tier) -> kick processing immediately in background (no external tick needed)
-    """
     ensure_db()
 
     ip = request.headers.get("X-Forwarded-For", request.remote_addr) or "unknown"
@@ -239,17 +227,17 @@ def build_pack():
     payload.setdefault("include_visual", True)
 
     force_sync = bool(payload.get("sync", False))
-    async_enabled = bool(settings.ASYNC_ENABLED) and not force_sync
+    async_enabled = bool(getattr(settings, "ASYNC_ENABLED", True)) and not force_sync
 
     db = _db()
     try:
         running = _count_status(db, "running")
         queued = _count_status(db, "queued")
 
-        if running >= settings.MAX_CONCURRENT_JOBS:
+        if running >= getattr(settings, "MAX_CONCURRENT_JOBS", 2):
             return jsonify({"error": "busy", "running": running}), 429
 
-        if queued >= settings.MAX_QUEUE_BACKLOG:
+        if queued >= getattr(settings, "MAX_QUEUE_BACKLOG", 50):
             return jsonify({"error": "queue_backlog_full", "queued": queued}), 429
 
         job = Job(status="queued", progress=0.0, request=payload)
@@ -257,42 +245,35 @@ def build_pack():
         db.commit()
         db.refresh(job)
 
-        q = get_queue()
+        # ملاحظة: لا نستخدم RQ إلا لو فعّلت USE_RQ صراحة
+        use_rq = bool(getattr(settings, "USE_RQ", False))
+        q = get_queue() if use_rq else None
 
-        # Paid mode (Redis queue + Worker)
         if async_enabled and q is not None:
             q.enqueue("tasks.process_build_pack", job.id)
             return jsonify(_job_to_dict(job)), 202
 
-        # FREE mode: kick immediately (no waiting for tick)
-        if async_enabled and q is None:
-            # require tick token to keep internal endpoint protected; but we no longer depend on it
-            # still, we respect your environment security posture
-            if not settings.WORKER_TICK_TOKEN:
+        if async_enabled:
+            # FREE/AUTOPILOT: شغّل فورًا من نفس السيرفر
+            if not getattr(settings, "WORKER_TICK_TOKEN", None):
                 return jsonify({"error": "missing_WORKER_TICK_TOKEN_on_server"}), 503
 
-            # atomic mark running -> then background kick
-            ok = _mark_job_running_atomic(db, job.id)
-            if ok:
+            if _atomic_set_running(db, job.id):
                 _kick_background(job.id)
-                job = db.get(Job, job.id)
-                return jsonify(_job_to_dict(job)), 202
 
-            # if already claimed, just return current state
-            job = db.get(Job, job.id)
-            return jsonify(_job_to_dict(job)), 202
+            # أعد قراءة job بحالة محدثة
+            job2 = db.get(Job, job.id)
+            return jsonify(_job_to_dict(job2 or job)), 202
 
-        # Local/dev fallback sync only
+        # fallback sync (يفضل عدم استخدامه على Render)
         process_build_pack(job.id)
-        job = db.get(Job, job.id)
-        if not job:
+        job2 = db.get(Job, job.id)
+        if not job2:
             return jsonify({"error": "job_lost"}), 500
-
-        if job.status == "done" and job.pack_id:
-            pack = db.get(Pack, job.pack_id)
-            return jsonify({"job": _job_to_dict(job), "pack": _pack_to_dict(pack, job_id=job.id)}), 200
-
-        return jsonify(_job_to_dict(job)), 500
+        if job2.status == "done" and job2.pack_id:
+            pack = db.get(Pack, job2.pack_id)
+            return jsonify({"job": _job_to_dict(job2), "pack": _pack_to_dict(pack, job_id=job2.id)}), 200
+        return jsonify(_job_to_dict(job2)), 500
 
     finally:
         db.close()
@@ -324,85 +305,38 @@ def get_pack(pack_id: str):
         db.close()
 
 
-def _claim_next_job_postgres(db: Session) -> str | None:
-    sql = text("""
-    WITH next AS (
-      SELECT id
-      FROM jobs
-      WHERE status = 'queued'
-      ORDER BY created_at ASC
-      LIMIT 1
-      FOR UPDATE SKIP LOCKED
-    )
-    UPDATE jobs
-    SET status = 'running',
-        started_at = NOW(),
-        updated_at = NOW(),
-        progress = 0.01
-    FROM next
-    WHERE jobs.id = next.id
-    RETURNING jobs.id;
-    """)
-    row = db.execute(sql).fetchone()
-    return row[0] if row else None
-
-
-def _claim_next_job_fallback(db: Session) -> str | None:
-    stmt = select(Job).where(Job.status == "queued").order_by(Job.created_at.asc()).limit(1)
-    job = db.execute(stmt).scalars().first()
-    if not job:
-        return None
-    job.status = "running"
-    job.started_at = datetime.utcnow()
-    job.updated_at = datetime.utcnow()
-    job.progress = 0.01
-    db.add(job)
-    db.commit()
-    return job.id
-
-
 @app.post("/internal/worker-tick")
 def worker_tick():
     """
     Failsafe tick:
-    - Claim jobs and kick them quickly (non-blocking).
-    - Useful if backlog exists or after restarts.
+    يلتقط أقدم queued job ويطلقه (غير معتمد عليه كمسار رئيسي).
     """
     ensure_db()
 
     token = request.headers.get("X-Worker-Token") or request.args.get("token")
-    if not settings.WORKER_TICK_TOKEN or token != settings.WORKER_TICK_TOKEN:
+    if not getattr(settings, "WORKER_TICK_TOKEN", None) or token != settings.WORKER_TICK_TOKEN:
         return jsonify({"error": "forbidden"}), 403
 
-    limit_raw = request.args.get("limit", "1")
     try:
-        limit = int(limit_raw)
+        limit = int(request.args.get("limit", "1"))
     except Exception:
         limit = 1
-    limit = max(1, min(2, limit))
+    limit = max(1, min(3, limit))
 
     kicked = []
     db = _db()
     try:
         for _ in range(limit):
-            job_id = None
-            try:
-                job_id = _claim_next_job_postgres(db)
-            except Exception:
-                job_id = _claim_next_job_fallback(db)
-
-            if not job_id:
+            jid = _atomic_claim_oldest_queued(db)
+            if not jid:
                 break
-
-            _kick_background(job_id)
-            kicked.append(job_id)
-
+            _kick_background(jid)
+            kicked.append(jid)
         return jsonify({"kicked": kicked, "count": len(kicked)}), 200
     finally:
         db.close()
 
 
-# Startup
 try:
     ensure_db()
 except Exception:
