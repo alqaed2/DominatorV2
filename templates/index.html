@@ -1,120 +1,411 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html lang="ar" dir="rtl">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dominux Master Engine V30</title>
-    <!-- Supreme High-Load Stack -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet-test">
-    <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@800&family=IBM+Plex+Sans+Arabic:wght@500;700&display=swap" rel="stylesheet">
-    <style>
-        :root { --main-cyan: #07f2ff; }
-        body { background: #030405; color: #f2f3f4; font-family: sans-serif; height: 100vh; display: flex; flex-direction: column; }
-        .is-ar { font-family: 'IBM Plex Sans Arabic', sans-serif; direction: rtl; } 
-        .clean-glass { background: #0c0e12; border: 1px solid rgba(255,255,255,0.06); box-shadow: 0 4px 50px rgba(0,0,0,0.4); overflow: hidden;}
-        /* Prevent Overlap Architecture */
-        .scrolling-grid { max-height: calc(100vh - 280px); overflow-y: auto; overflow-x: hidden; scrollbar-width: none;}
-        .v-indicator { font-size: 0.6rem; border-left: 2px solid var(--main-cyan); font-weight: 800; background: rgba(7,242,255,.05); border-radius: 4px; padding: 4px }
-        .is-ar .v-indicator {border-left: none; border-right: 2px solid var(--main-cyan)}
-        .prime-button { background: var(--main-cyan); color: #000; box-shadow: 0 0 15px rgba(7, 242, 255, 0.2); }
-    </style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>AI DOMINATOR — Control Console</title>
+
+  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}" />
 </head>
-<body class="p-6 md:p-10 is-ar">
 
-    <!-- OVERLOR NAV AREA -->
-    <header class="flex justify-between items-center bg-[#070b0e] mb-1 p-2 h box shadow mb px h min p uppercase pb-white m center pb line p opacity 1 justify justify ms pt line transform items p group ms opacity hover shadow underline md m mb b items rotate underline 5 min h items px-shadow">
-         <div class="header transform transition rounded hidden mb mb line gap 8 transition decoration items px rotate md absolute absolute h mx-shadow uppercase absolute line block 1 p items btn px rotate uppercase lowercase decoration underline tracking group list pointer transform"> ـ Dominux _ Global Dominance Node _ </div> 
-       <h1 class="text-4xl">DOMINUX <strong>DNA</strong> XGen8 </h1>
-       <section class="max mt cursor px list hidden decoration transform text shadow underline lowercase font -sm text items gap mx bg transition mt italic decoration block pb pointer relative">ـ</aside>
-       <!-- CLEAR UI HEADER : -->
-       <h2 class="shadow-cyan items font transition font border pointer outline md px item justify select h group group mb italic inline transform px-italic uppercase transition pt px tracking h relative"> ARCHITECTURE DOMX 🧬: TIKXEN 02.99 A</h2>
-    <select id="lPref" onchange="document.body.className = this.value==='ar'?'p-6 md:p-10 is-ar':'p-6 md:p-10'" class="p p-ms absolute uppercase shadow -mb m mt shadow underline relative p bg border block relative italic -right mt btn bg mx shadow md h-md font absolute h transform justify font inline transition rotate absolute">
-        <option value="ar" selected>KINGDOM_SA Zone</option>          <option value="en">GLOBAL_EN Zone</option>
-    </select>
-    </header>
+<body>
+  <!-- Background FX -->
+  <div class="bg">
+    <div class="bg-grid"></div>
+    <div class="bg-glow bg-glow-1"></div>
+    <div class="bg-glow bg-glow-2"></div>
+  </div>
 
-    <!-- CONTENT COMMAND UNIT -->
-    <main class="lg:px-1 absolute md items center -r0 align italic 8 py 3 justify transform italic text block rotate relative selection flex list mb transform decoration pb line align mx md selection group whitespace h border -p gap-9 list mb 1 pointer transition align uppercase shadow col col items ms">_ DATA IO _</article>
-      <div class="md:grid flex lg gap-mx p px justify shadow md col auto 1 separation whitespace -indigo relative lowercase separation list group mt center cursor lowercase alignment logic pb-0 transformation whitespace transition ms selection absolute col grid container h selection inline transformation block pointer decoration align underline px tracking justify lowercase p whitespace shadow mt rotation grid 8 mx items">
-           <input type="text" id="target" placeholder="TYPE_MISSION_ TARGET.ـأدج مجال المهمه"
-           class="flex-1 -8-fixed bg underline m px transition items 6 mx ms line underline scale whitespace text italic absolute m shadow pb inline items selection pointer m-p decoration list lowercase mt hover font bold selection text px text pt lg col absolute absolute"> 
-           <button class="prime-button -7 h italic px transform lowercase rotation pointer underline capitalize-shadow pointer decoration select items inline pb pointer underline md selection -4 min shadow h ms h absolute block p transition font 8 rotate italic px font items text whitespace py center shadow cursor">LAUNCH ATTACK SYNDICATE</button>
+  <div class="app">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">⚙</div>
+        <div class="brand-text">
+          <div class="brand-title">AI DOMINATOR</div>
+          <div class="brand-sub">Control Console • v12.9</div>
+        </div>
       </div>
-+   <div class="md:col-span-1 border border h absolute px h line rotate h mb gap decoration selection shadow text pb whitespace justify items opacity underline uppercase px transition absolute underline btn italic 6 h items justify relative -p lowercase 1 h hidden transition font ">ـ Logic Core Stabilized _ </div>
-+      <div class="h group flex text mx p 1 gap flex flex-sm m list italic group grid auto hover absolute lg-px hidden float mb justify items shadow underline rotate pointer transform shadow hidden transition lowercase italic pb inline rounded transition mx -9 grid container pt cursor h list auto uppercase logic m whitespace justify md pointer ">
-+           <input id="activeTarget" type="text" autocomplete="off" class="w-full h-8-fixed glass h border m selection items 4-mb shadow text mx underline italic mx bold decoration px underline absolute pointer select mb h px block bold decoration h rotate hover line mx uppercase -p selection underline decoration mb pt uppercase px selection px tracking px selection line h underline px font py m hover absolute items selection ms select inline py">
-+           <button onclick="calibDominatorSystem()" class="glow-bg bg-cyan-500 rounded p h border justify absolute min transition list mx font shadow whitespace p py bold rotation uppercase h px decoration bg transition mb-20 pointer shadow md py italic items pb underline underline underline ">_ EXEC PROTOCOL ._ </button>
-+      </div><!-- END INPUT ARCHITECTURE : FIX OVERVIEW ISSUES !! -> 
-+   </section>
 
-<!-- THE STABLE LIVE HUD (Heads-up display) -->
-<article style="display:none;" id="syndromeXHub" class="scrolling-grid h pt decoration gap transition mx hidden md auto transformation absolute pointer grid-cols pointer line bg p decoration auto mb line p pt 4 grid lg grid items auto 8 text mx bg transformation lg lg gap shadow absolute pb ms ">
-     <!-- No Overflow No Symbols logic Re-Applied -->
-</article>
+      <nav class="nav">
+        <button class="nav-item active" data-view="forge">
+          <span class="nav-ico">◆</span>
+          <span>مختبر التخليق</span>
+        </button>
+        <button class="nav-item" data-view="jobs">
+          <span class="nav-ico">◈</span>
+          <span>الوظائف</span>
+        </button>
+        <button class="nav-item" data-view="packs">
+          <span class="nav-ico">⬢</span>
+          <span>الحزم</span>
+        </button>
+        <button class="nav-item" data-view="settings">
+          <span class="nav-ico">⚙</span>
+          <span>الإعدادات</span>
+        </button>
+      </nav>
 
-<script>
-    const GPSX = p => document.getElementById(p);
+      <div class="sidebar-footer">
+        <div class="status-card">
+          <div class="status-row">
+            <span class="dot" id="readyDot"></span>
+            <span class="muted">الحالة</span>
+            <span class="pill" id="readyText">…</span>
+          </div>
+          <div class="status-row">
+            <span class="muted">آخر Job</span>
+            <span class="mono small" id="lastJob">—</span>
+          </div>
+          <div class="status-row">
+            <span class="muted">آخر Pack</span>
+            <span class="mono small" id="lastPack">—</span>
+          </div>
+          <div class="status-actions">
+            <button class="btn ghost" id="btnRefresh">تحديث</button>
+            <button class="btn ghost" id="btnClear">مسح</button>
+          </div>
+        </div>
 
-    const cpRawDNA = val => { 
-        navigator.clipboard.writeText(val); // Silent copy for sovereign action 
-        const hIno = GPSX('lPref'); 
-          let oldVal = hIno.innerHTML; hIno.innerHTML = "<option>SYNCING DNA ✅ـ</option>";
-          setTimeout(()=>{ hIno.innerHTML = oldVal; }, 1500); 
-    };
+        <div class="tiny muted">
+          ملاحظة: هذه واجهة تشغيل Production-Grade بدون Tailwind CDN.
+        </div>
+      </div>
+    </aside>
 
-    async function calibDominatorSystem() {
-        const inp = GPSX('activeTarget').value;
-        const lgCode = GPSX('lPref').value;
-        if(!inp) return; 
+    <!-- Main -->
+    <main class="main">
+      <!-- Topbar -->
+      <header class="topbar">
+        <div class="crumbs">
+          <span class="muted">DominatorV2</span>
+          <span class="sep">/</span>
+          <span class="strong" id="pageTitle">مختبر التخليق</span>
+        </div>
 
-        GPSX('syndromeXHub').style.display = 'block'; GPSX('syndromeXHub').innerHTML = "<marquee>EXTRACTING COMPETING VIRAL PATTERNS 🧬...</marquee>";
-        
-        try{
-            const connectRes = await fetch('/v1/build-dna', {
-                method: 'POST', headers: {'Content-Type':'application/json'},
-                body: JSON.stringify({ subject: inp, lang : lgCode })
-            });
-            const backJSONData = await connectRes.json();
-            if(backJSONData.success){ renderUINoBreakage(backJSONData.bundle); }
-        } catch(V) { console.error("Communication Termed At Port Nucleus-500"); }
-    }
+        <div class="top-actions">
+          <div class="kbdhint">
+            <span class="pill">Ctrl</span> + <span class="pill">Enter</span>
+            <span class="muted">لتشغيل التخليق</span>
+          </div>
+          <a class="btn primary" href="/healthz" target="_blank" rel="noreferrer">Health</a>
+        </div>
+      </header>
 
-    function renderUINoBreakage(masterB) {
-        let vBox = ''; masterB.visuals.forEach((vx, ix ) => {
-            vBox += `<div onclick="cpRawDNA(\`${vx}\` )" class="clean-glass p-8 rounded-5 hover:border-blue opacity transition decoration border-v hover rotate cursor p underline transform mb list underline italics border glass items md rotation absolute lowercase h hidden ms align shadow mb items md pointer italic h uppercase m list ms align pointer underline 3 italic rotation absolute transform md line 1 underline py italic p list rotate glass ">
-                        <span class="m pointer decoration hover p ms -p transition h shadow shadow rotation 9 justify m m justify transform absolute pointer 4 pt align block border italic absolute hover list italic hidden gap md select text shadow absolute pointer items top py rotate whitespace items border 1 tracking md mb absolute capitalize lowercase pointer ms transformation mb h selection p absolute underline items pb group py md pt 1 decoration transformation justify pb ms shadow decoration line cursor cursor italics block rotate space align hover cursor h block space h h h uppercase -4 items list space-v whitespace items hover m list h auto">Shot Segment ${ix+1}_GEN DATA | VERTICAL -_ـ</span>
-                        <h2>Shot Focus: { <mark class="text-xs bg-red lowercase px btn px color-shadow italic shadow pt py h selection absolute m mx items items">"${vx}"</mark> }</h2> <small>Press Component Area To Copy Vector DNA ._ـ </small>
-                     </div> `;
-        } )
+      <!-- Views -->
+      <section class="views">
+        <!-- View: Forge -->
+        <div class="view active" id="view-forge">
+          <div class="grid-2">
+            <!-- Left column: inputs -->
+            <div class="stack">
+              <div class="card">
+                <div class="card-head">
+                  <div>
+                    <div class="card-title">إدخال سيادي</div>
+                    <div class="card-sub">اختر: نيش أو رابط. ثم اصنع Pack متعدد المنصات.</div>
+                  </div>
+                  <div class="badge">SIC • Alchemy</div>
+                </div>
 
-        GPSX('syndromeXHub').innerHTML = `
-              <div class="lg:col-span-1 font h selection absolute items space-y-7 absolute transformation ms line items mx list ms italic pointer m px transform absolute transition absolute text whitespace absolute mb list hover transform mx opacity opacity h opacity py scale list group rotate py pointer italics rotate h m m transition">
-                   
-                   <!-- SECTION A: HOOK TENSION 0 -ـ الصدمه السيسكوني للنص المنشور -->
-                   <div onclick="cpRawDNA(\`${masterB.hook}\` )" class="scrolling underline absolute h 6 md glass pointer shadow 9 mb justify rotate transform italic px whitespace line rounded relative scale md list hidden shadow b italic line select shadow relative items group-1 glass select h cursor px 0 2 pt 2 transition justify">
-                        <cite class="pointer transformation select underline ms h absolute m 8 bg block shadow transform lowercase shadow float btn">THE FIRST CONTACT [ DNA-HOOK LAYER ]_ :</cite>
-                        <p class="text-[0.6rem] m scale relative decoration mx transition py transform text 6 group hidden transition decoration underline transition ms hover -4 lg grid h outline whitespace opacity italics md p -center items text group absolute inline bg uppercase list mx decoration lowercase h pt m block scale italic h pt italic ms line underline absolute mx pt transform group selection mb lowercase rotate border items lowercase underline font hidden opacity ">${masterB.hook}</p>
-                        <h2 class="shadow cursor whitespace md grid absolute h inline py transition col transition alignment m line link market global Logic outcome target calibrated ${GPSX('lPref').value==='ar'?'text-3xl text-right md:leading-relaxed':'text-2xl font-bold'}  mx list underline shadow m 8 hover relative text pointer text underline shadow text italics box leading items decoration inline "> " ${masterB.hook} "</h2>
-                        <b> -- ( Press to Capture Neural Sequence ⚓) -- </b>
-                   </div> 
+                <div class="form">
+                  <div class="row">
+                    <label class="seg">
+                      <input type="radio" name="mode" value="niche" checked />
+                      <span>نيش</span>
+                    </label>
+                    <label class="seg">
+                      <input type="radio" name="mode" value="url" />
+                      <span>رابط</span>
+                    </label>
+                  </div>
 
-                   <!-- SECTION B: TIKTOK PACKED DESCRIPTION -ـ الوصف المعد للنسخ تحت القالب مباشرة مع الهاشتاجات -->
-                    <div id="tk_main_read" onclick="cpRawDNA(\`${masterB.caption}\` )" class="p ms italic absolute selection md mt bold -italic py px mb block m italics px ms p-8 rounded font m ms p px block italic active pointer bg glass shadow decoration pb md pointer whitespace decoration box italics mt mb block select italic-none list ms scale m pb list italic pointer outline block tracking bold leading line py italics pb line underline h md selection">
-                         <span class="m pointer ms shadow italic ms list italic selection shadow mt mb absolute items lowercase px -4 rotation transform rotation underline pt pb italics absolute absolute block opacity tracking group opacity underline transform md group items list absolute justify decoration inline align "> TIKTOK _ EXPERT_CAPTION FOR POST_ [ AUTO-HTAGS .SYST ] x:</span>
-                         <hr>
-                         <p class="h underline italic selection py-9 lowercase scale hover underline decoration lead py hover line shadow line list border leading font-bold mt mt "> "${masterB.caption}" </p>
-                         <center data-p class="m opacity px rotate px border p group absolute m float relative rotation selection opacity border md hidden h lowercase hidden lowercase pointer bg italic inline border absolute uppercase mx select pb rotate gap decoration 1 ">ـ SYNC: READY FOR PUBLISH ـ - - </center>
+                  <div class="field">
+                    <label class="label" id="inputLabel">اكتب النيش</label>
+                    <textarea id="inputValue" class="textarea" rows="3"
+                      placeholder="مثال: التسويق بالذكاء الاصطناعي لشركات المقاولات"></textarea>
+                    <div class="hint">
+                      Tip: استخدم ترند/هاشتاق داخل النيش لتعزيز Trend-fit.
+                    </div>
+                  </div>
+
+                  <div class="row">
+                    <div class="field">
+                      <label class="label">اللغة</label>
+                      <select id="language" class="select">
+                        <option value="ar" selected>العربية</option>
+                        <option value="en">English</option>
+                      </select>
                     </div>
 
+                    <div class="field">
+                      <label class="label">النبرة</label>
+                      <select id="tone" class="select">
+                        <option value="authority" selected>Authority (سيادي)</option>
+                        <option value="tactical">Tactical (تنفيذي)</option>
+                        <option value="contrarian">Contrarian (صادم)</option>
+                        <option value="story">Story (سردي)</option>
+                        <option value="ceo">CEO (قيادي)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div class="field">
+                    <label class="label">المنصات</label>
+                    <div class="chips">
+                      <label class="chip"><input type="checkbox" value="linkedin" checked />LinkedIn</label>
+                      <label class="chip"><input type="checkbox" value="x" checked />X</label>
+                      <label class="chip"><input type="checkbox" value="tiktok" checked />TikTok</label>
+                    </div>
+                  </div>
+
+                  <div class="row">
+                    <label class="toggle">
+                      <input type="checkbox" id="includeVisual" checked />
+                      <span class="toggle-ui"></span>
+                      <span class="toggle-text">توليد أصل بصري (Visual Sovereignty)</span>
+                    </label>
+
+                    <label class="toggle">
+                      <input type="checkbox" id="syncMode" />
+                      <span class="toggle-ui"></span>
+                      <span class="toggle-text">تشغيل Sync (للتجربة فقط)</span>
+                    </label>
+                  </div>
+
+                  <div class="actions">
+                    <button class="btn primary wide" id="btnForge">
+                      <span class="spark">✦</span>
+                      Forge Dominance Pack
+                    </button>
+                    <button class="btn ghost" id="btnTrending">جلب الترندات</button>
+                  </div>
+                </div>
               </div>
-              
-              <div class="lg:col-span-3 h pt ms transition transform space rotation align m md absolute m 4 py transform bg italics selection rotate space italic lowercase transition decoration pointer col list transformation h ms m transition transformation pointer text scale separation separation auto col container grid mx uppercase Logic p-m h Logic mapping visualize -span auto-p -Indigo selection mb separation separation -indigo " >
-                  <!-- COMPOSING THE 9:16 ENFORCED SHOTS ARRAY WITHOUT breakage!! -> 
-                  ` + vBox + `
-              </div> 
-        `; // FULL UI ASSEMBLY SYNC REWIRING SUCCESS _ 
-    }
-</script>
+
+              <div class="card">
+                <div class="card-head">
+                  <div>
+                    <div class="card-title">رادار الترندات</div>
+                    <div class="card-sub">اضغط أي هاشتاق لإضافته بسرعة داخل النيش.</div>
+                  </div>
+                  <div class="badge subtle" id="trendsStatus">Idle</div>
+                </div>
+
+                <div class="trendbox" id="trendsBox">
+                  <div class="muted">اضغط "جلب الترندات" لعرض القائمة.</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right column: output -->
+            <div class="stack">
+              <div class="card">
+                <div class="card-head">
+                  <div>
+                    <div class="card-title">لوحة التنفيذ</div>
+                    <div class="card-sub">متابعة Job + عرض Pack + نسخ سريع.</div>
+                  </div>
+                  <div class="badge" id="jobBadge">—</div>
+                </div>
+
+                <div class="jobbar">
+                  <div class="job-meta">
+                    <div class="mono small" id="jobId">job: —</div>
+                    <div class="mono small" id="packId">pack: —</div>
+                  </div>
+                  <div class="progress">
+                    <div class="progress-fill" id="progressFill" style="width:0%"></div>
+                  </div>
+                  <div class="job-meta">
+                    <div class="muted small" id="jobStatus">status: idle</div>
+                    <div class="muted small" id="jobEta">polling: off</div>
+                  </div>
+                </div>
+
+                <div class="tabs">
+                  <button class="tab active" data-tab="tab-pack">Pack</button>
+                  <button class="tab" data-tab="tab-genes">Genes</button>
+                  <button class="tab" data-tab="tab-visual">Visual</button>
+                  <button class="tab" data-tab="tab-score">Score</button>
+                  <button class="tab" data-tab="tab-raw">Raw</button>
+                </div>
+
+                <div class="tabpanes">
+                  <div class="tabpane active" id="tab-pack">
+                    <div class="outgrid">
+                      <div class="outcard">
+                        <div class="outhead">
+                          <div class="outtitle">LinkedIn</div>
+                          <button class="btn tiny" data-copy="linkedin">Copy</button>
+                        </div>
+                        <pre class="pre" id="outLinkedIn">—</pre>
+                      </div>
+
+                      <div class="outcard">
+                        <div class="outhead">
+                          <div class="outtitle">X</div>
+                          <button class="btn tiny" data-copy="x">Copy</button>
+                        </div>
+                        <pre class="pre" id="outX">—</pre>
+                      </div>
+
+                      <div class="outcard">
+                        <div class="outhead">
+                          <div class="outtitle">TikTok</div>
+                          <button class="btn tiny" data-copy="tiktok">Copy</button>
+                        </div>
+                        <pre class="pre" id="outTikTok">—</pre>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="tabpane" id="tab-genes">
+                    <div class="outcard">
+                      <div class="outhead">
+                        <div class="outtitle">DNA (Extracted Genes)</div>
+                        <button class="btn tiny" data-copy="genes">Copy</button>
+                      </div>
+                      <pre class="pre" id="outGenes">—</pre>
+                    </div>
+                  </div>
+
+                  <div class="tabpane" id="tab-visual">
+                    <div class="outgrid">
+                      <div class="outcard">
+                        <div class="outhead">
+                          <div class="outtitle">Visual Prompt</div>
+                          <button class="btn tiny" data-copy="vprompt">Copy</button>
+                        </div>
+                        <pre class="pre" id="outVPrompt">—</pre>
+                      </div>
+
+                      <div class="outcard">
+                        <div class="outhead">
+                          <div class="outtitle">Generated Image</div>
+                          <a class="btn tiny" id="openImage" href="#" target="_blank" rel="noreferrer">Open</a>
+                        </div>
+                        <div class="imgbox" id="imgBox">
+                          <div class="muted">—</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="tabpane" id="tab-score">
+                    <div class="outcard">
+                      <div class="outhead">
+                        <div class="outtitle">Dominance Score</div>
+                        <button class="btn tiny" data-copy="score">Copy</button>
+                      </div>
+                      <div class="score">
+                        <div class="score-big">
+                          <span id="scoreNum">—</span>
+                          <span class="muted small">/ 100</span>
+                        </div>
+                        <div class="score-meta">
+                          <div class="pill" id="scoreRec">—</div>
+                          <div class="muted small" id="scoreWhy">—</div>
+                        </div>
+                      </div>
+                      <pre class="pre" id="outScore">—</pre>
+                    </div>
+                  </div>
+
+                  <div class="tabpane" id="tab-raw">
+                    <div class="outcard">
+                      <div class="outhead">
+                        <div class="outtitle">Raw JSON</div>
+                        <button class="btn tiny" data-copy="raw">Copy</button>
+                      </div>
+                      <pre class="pre" id="outRaw">—</pre>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="footer-actions">
+                  <button class="btn ghost" id="btnFetchLast">تحميل آخر نتيجة</button>
+                  <button class="btn ghost" id="btnStopPoll">إيقاف Polling</button>
+                </div>
+              </div>
+
+              <div class="card subtle">
+                <div class="card-head">
+                  <div>
+                    <div class="card-title">قواعد التشغيل</div>
+                    <div class="card-sub">منصة Jobs + Tick (GitHub Actions) جاهزة. لا يوجد ضغط على request.</div>
+                  </div>
+                </div>
+                <ul class="bullets">
+                  <li>كل طلب Forge يرجع <span class="mono">job_id</span> فورًا.</li>
+                  <li>الواجهة تعمل Polling وتُحمّل <span class="mono">pack</span> عند الجاهزية.</li>
+                  <li>ترندات: fallback آمن إذا Apify غير مهيأ.</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- View: Jobs -->
+        <div class="view" id="view-jobs">
+          <div class="card">
+            <div class="card-head">
+              <div>
+                <div class="card-title">Jobs</div>
+                <div class="card-sub">هذه الصفحة ستكون لوحة مراقبة وظائف متقدمة (قريبًا).</div>
+              </div>
+            </div>
+            <div class="muted">حاليًا نستخدم polling على job_id مباشرة.</div>
+          </div>
+        </div>
+
+        <!-- View: Packs -->
+        <div class="view" id="view-packs">
+          <div class="card">
+            <div class="card-head">
+              <div>
+                <div class="card-title">Packs</div>
+                <div class="card-sub">هذه الصفحة ستكون أرشيف الحزم (قريبًا).</div>
+              </div>
+            </div>
+            <div class="muted">حاليًا يمكنك تحميل pack عبر pack_id أو “تحميل آخر نتيجة”.</div>
+          </div>
+        </div>
+
+        <!-- View: Settings -->
+        <div class="view" id="view-settings">
+          <div class="card">
+            <div class="card-head">
+              <div>
+                <div class="card-title">Settings</div>
+                <div class="card-sub">إعدادات الواجهة فقط. إعدادات السيرفر من Render Env.</div>
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="field">
+                <label class="label">Polling Interval (ms)</label>
+                <input class="input" id="pollInterval" type="number" min="800" step="200" value="2000" />
+                <div class="hint">افتراضيًا 2000ms. لا تقلل كثيرًا لتجنب rate limit.</div>
+              </div>
+              <div class="field">
+                <label class="label">Max Poll Attempts</label>
+                <input class="input" id="pollMax" type="number" min="10" step="5" value="90" />
+                <div class="hint">افتراضيًا 90 محاولة (~3 دقائق).</div>
+              </div>
+            </div>
+
+            <div class="actions">
+              <button class="btn primary" id="btnSaveUi">حفظ إعدادات الواجهة</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
 </body>
 </html>
