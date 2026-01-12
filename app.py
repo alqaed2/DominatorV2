@@ -27,7 +27,7 @@ _requests_by_ip: dict[str, deque[float]] = defaultdict(deque)
 _DB_INIT_DONE = False
 _DB_INIT_ERR: str | None = None
 
-# Prevent flooding background threads from this gunicorn worker
+# Prevent flooding background threads per gunicorn worker
 _BG_LOCK = threading.Lock()
 _BG_ACTIVE: set[str] = set()
 
@@ -151,8 +151,64 @@ def trending_hashtags():
     return jsonify({"hashtags": tags})
 
 
+def _mark_job_running_atomic(db: Session, job_id: str) -> bool:
+    """
+    Atomically move job from queued -> running (prevents duplicate kicks across workers).
+    Works on Postgres; fallback handles others.
+    """
+    try:
+        sql = text("""
+        UPDATE jobs
+        SET status = 'running',
+            started_at = NOW(),
+            updated_at = NOW(),
+            progress = 0.01
+        WHERE id = :id AND status = 'queued'
+        RETURNING id;
+        """)
+        row = db.execute(sql, {"id": job_id}).fetchone()
+        db.commit()
+        return bool(row)
+    except Exception:
+        # fallback: best effort
+        job = db.get(Job, job_id)
+        if not job or job.status != "queued":
+            return False
+        job.status = "running"
+        job.started_at = datetime.utcnow()
+        job.updated_at = datetime.utcnow()
+        job.progress = 0.01
+        db.add(job)
+        db.commit()
+        return True
+
+
+def _kick_background(job_id: str) -> bool:
+    with _BG_LOCK:
+        if job_id in _BG_ACTIVE:
+            return False
+        _BG_ACTIVE.add(job_id)
+
+    def _runner():
+        try:
+            process_build_pack(job_id)
+        finally:
+            with _BG_LOCK:
+                _BG_ACTIVE.discard(job_id)
+
+    t = threading.Thread(target=_runner, name=f"job-{job_id}", daemon=True)
+    t.start()
+    return True
+
+
 @app.post("/v1/build-pack")
 def build_pack():
+    """
+    FINAL FREE-TIER MODE:
+    - Create job fast
+    - If Redis worker exists -> enqueue
+    - Else (free tier) -> kick processing immediately in background (no external tick needed)
+    """
     ensure_db()
 
     ip = request.headers.get("X-Forwarded-For", request.remote_addr) or "unknown"
@@ -208,15 +264,25 @@ def build_pack():
             q.enqueue("tasks.process_build_pack", job.id)
             return jsonify(_job_to_dict(job)), 202
 
-        # Free mode (tick required)
-        if async_enabled and q is None and settings.WORKER_TICK_TOKEN:
+        # FREE mode: kick immediately (no waiting for tick)
+        if async_enabled and q is None:
+            # require tick token to keep internal endpoint protected; but we no longer depend on it
+            # still, we respect your environment security posture
+            if not settings.WORKER_TICK_TOKEN:
+                return jsonify({"error": "missing_WORKER_TICK_TOKEN_on_server"}), 503
+
+            # atomic mark running -> then background kick
+            ok = _mark_job_running_atomic(db, job.id)
+            if ok:
+                _kick_background(job.id)
+                job = db.get(Job, job.id)
+                return jsonify(_job_to_dict(job)), 202
+
+            # if already claimed, just return current state
+            job = db.get(Job, job.id)
             return jsonify(_job_to_dict(job)), 202
 
-        # Safety: do NOT run heavy sync in production if token missing
-        if async_enabled and q is None and not settings.WORKER_TICK_TOKEN:
-            return jsonify({"error": "async_enabled_but_no_tick_token"}), 503
-
-        # Fallback sync (local/dev)
+        # Local/dev fallback sync only
         process_build_pack(job.id)
         job = db.get(Job, job.id)
         if not job:
@@ -295,32 +361,12 @@ def _claim_next_job_fallback(db: Session) -> str | None:
     return job.id
 
 
-def _kick_background(job_id: str) -> bool:
-    # Avoid kicking the same job multiple times in this worker
-    with _BG_LOCK:
-        if job_id in _BG_ACTIVE:
-            return False
-        _BG_ACTIVE.add(job_id)
-
-    def _runner():
-        try:
-            process_build_pack(job_id)
-        finally:
-            with _BG_LOCK:
-                _BG_ACTIVE.discard(job_id)
-
-    t = threading.Thread(target=_runner, name=f"job-{job_id}", daemon=True)
-    t.start()
-    return True
-
-
 @app.post("/internal/worker-tick")
 def worker_tick():
     """
-    FINAL MODE:
-    - Claim up to N queued jobs atomically
-    - Kick execution in background threads (returns immediately)
-    - Never blocks HTTP request (prevents GitHub timeouts and connection resets)
+    Failsafe tick:
+    - Claim jobs and kick them quickly (non-blocking).
+    - Useful if backlog exists or after restarts.
     """
     ensure_db()
 
@@ -333,7 +379,7 @@ def worker_tick():
         limit = int(limit_raw)
     except Exception:
         limit = 1
-    limit = max(1, min(2, limit))  # keep it conservative on free tier
+    limit = max(1, min(2, limit))
 
     kicked = []
     db = _db()
@@ -348,8 +394,8 @@ def worker_tick():
             if not job_id:
                 break
 
-            if _kick_background(job_id):
-                kicked.append(job_id)
+            _kick_background(job_id)
+            kicked.append(job_id)
 
         return jsonify({"kicked": kicked, "count": len(kicked)}), 200
     finally:
