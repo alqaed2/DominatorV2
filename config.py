@@ -33,10 +33,18 @@ class Settings:
     # Queue / Worker
     REDIS_URL: str | None = _getenv("REDIS_URL")
     QUEUE_NAME: str = _getenv("QUEUE_NAME", "dominator") or "dominator"
+
+    # Async mode:
+    # - If True and REDIS+Worker exists -> enqueue
+    # - If True and NO Worker -> remain queued and processed by /internal/worker-tick
     ASYNC_ENABLED: bool = _getbool("ASYNC_ENABLED", True)
 
-    # Rate / load guards
-    MAX_CONCURRENT_JOBS: int = _getint("MAX_CONCURRENT_JOBS", 3)
+    # Workerless tick security (REQUIRED for free mode)
+    WORKER_TICK_TOKEN: str | None = _getenv("WORKER_TICK_TOKEN")
+
+    # Load guards
+    MAX_CONCURRENT_JOBS: int = _getint("MAX_CONCURRENT_JOBS", 2)   # running only
+    MAX_QUEUE_BACKLOG: int = _getint("MAX_QUEUE_BACKLOG", 30)      # queued backlog cap
     MAX_REQUESTS_PER_IP_PER_MIN: int = _getint("MAX_REQUESTS_PER_IP_PER_MIN", 30)
 
     # Model routing
@@ -51,7 +59,6 @@ class Settings:
     # Trends
     TRENDS_PROVIDER: str = _getenv("TRENDS_PROVIDER", "mock") or "mock"
     APIFY_TOKEN: str | None = _getenv("APIFY_TOKEN")
-    # Optional: direct endpoint that returns JSON list of hashtags/trends
     APIFY_TRENDS_ENDPOINT: str | None = _getenv("APIFY_TRENDS_ENDPOINT")
 
 
