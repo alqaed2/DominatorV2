@@ -5,9 +5,9 @@ import threading
 import time
 from collections import defaultdict, deque
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, jsonify, request, render_template
 
 from config import settings
 from db import init_db, SessionLocal, engine
@@ -15,19 +15,21 @@ from models import Job, Pack
 from tasks import process_build_pack, worker_tick
 
 
-app = Flask(__name__, static_folder="static", static_url_path="/static")
-
+app = Flask(
+    __name__,
+    template_folder="templates",
+    static_folder="static",
+    static_url_path="/static",
+)
 
 # -------------------------------
 # Boot
 # -------------------------------
 
 def _boot() -> None:
-    # Create tables if missing
     init_db()
 
 _boot()
-
 
 # -------------------------------
 # Helpers
@@ -38,19 +40,17 @@ def _now() -> datetime:
 
 
 def _client_ip() -> str:
-    # Render provides X-Forwarded-For
     xff = request.headers.get("X-Forwarded-For", "")
     if xff:
         return xff.split(",")[0].strip()
     return request.remote_addr or "unknown"
 
 
-# Simple per-IP limiter for build-pack only
 _REQ_LOG: Dict[str, deque] = defaultdict(deque)
 
 
 def _rate_limit_ok(ip: str) -> (bool, int):
-    limit = int(getattr(settings, "MAX_REQUESTS_PER_IP_PER_MIN", 30) or 30)
+    limit = int(getattr(settings, "MAX_REQUESTS_PER_IP_PER_MIN", 60) or 60)
     window = 60
     now = time.time()
     q = _REQ_LOG[ip]
@@ -64,18 +64,16 @@ def _rate_limit_ok(ip: str) -> (bool, int):
 
 
 def _cleanup_stale_running(db) -> int:
-    """
-    Critical: never allow running jobs to live forever.
-    Any running job older than STALE_SEC is failed.
-    """
     stale_sec = max(180, int(getattr(settings, "MODEL_TIMEOUT_SEC", 45) or 45) * 3)
     cutoff = _now() - timedelta(seconds=stale_sec)
 
-    # started_at may be NULL in some legacy rows; fallback to updated_at/created_at
     q = (
         db.query(Job)
         .filter(Job.status == "running")
-        .filter((Job.started_at != None) & (Job.started_at < cutoff) | (Job.started_at == None) & (Job.updated_at < cutoff))
+        .filter(
+            ((Job.started_at != None) & (Job.started_at < cutoff))
+            | ((Job.started_at == None) & (Job.updated_at < cutoff))
+        )
     )
     n = q.count()
     if n:
@@ -103,12 +101,6 @@ def _spawn_job(job_id: str) -> None:
 
 
 def _kick_scheduler(max_to_start: int = 2) -> Dict[str, Any]:
-    """
-    Opportunistic scheduler:
-    - cleanup stale running
-    - start queued jobs up to MAX_CONCURRENT_JOBS
-    - atomic claim to avoid duplicates across gunicorn workers
-    """
     db = SessionLocal()
     try:
         cleaned = _cleanup_stale_running(db)
@@ -122,13 +114,11 @@ def _kick_scheduler(max_to_start: int = 2) -> Dict[str, Any]:
         if available <= 0:
             return {"ok": True, "cleaned": cleaned, "started": 0, "running": running}
 
-        # Backlog guard (optional)
-        backlog_cap = int(getattr(settings, "MAX_QUEUE_BACKLOG", 30) or 30)
+        backlog_cap = int(getattr(settings, "MAX_QUEUE_BACKLOG", 60) or 60)
         queued = _count_status(db, "queued")
         if queued > backlog_cap:
             return {"ok": True, "cleaned": cleaned, "started": 0, "running": running, "queued": queued, "backlog_cap": backlog_cap}
 
-        # Select oldest queued
         jobs = (
             db.query(Job)
             .filter(Job.status == "queued")
@@ -139,7 +129,6 @@ def _kick_scheduler(max_to_start: int = 2) -> Dict[str, Any]:
 
         started = 0
         for j in jobs:
-            # Atomic claim: only start if still queued
             updated = (
                 db.query(Job)
                 .filter(Job.id == j.id, Job.status == "queued")
@@ -163,14 +152,32 @@ def _kick_scheduler(max_to_start: int = 2) -> Dict[str, Any]:
         db.close()
 
 
+def p_to_dict(p: Optional[Pack]) -> Optional[Dict[str, Any]]:
+    if not p:
+        return None
+    return {
+        "id": p.id,
+        "mode": p.mode,
+        "input_value": p.input_value,
+        "language": p.language,
+        "platforms": p.platforms,
+        "tone": p.tone,
+        "genes": p.genes,
+        "assets": p.assets,
+        "visual": p.visual,
+        "dominance": p.dominance,
+        "sources": p.sources,
+        "created_at": p.created_at.isoformat() + "Z" if p.created_at else None,
+    }
+
 # -------------------------------
 # Web / Health
 # -------------------------------
 
 @app.get("/")
 def home():
-    # Serve templates without Jinja dependency (keep simple)
-    return send_from_directory("templates", "index.html")
+    # IMPORTANT: render via Jinja so {{ url_for(...) }} resolves
+    return render_template("index.html")
 
 
 @app.get("/healthz")
@@ -197,7 +204,6 @@ def readyz():
 
 @app.get("/v1/trending-hashtags")
 def trending_hashtags():
-    # Safe fallback (you can wire Apify later without breaking)
     items = [
         {"tag": "#AI", "score": 98},
         {"tag": "#Marketing", "score": 92},
@@ -219,7 +225,6 @@ def build_pack():
     data = request.get_json(silent=True) or {}
     mode = str(data.get("mode") or "niche").strip()
 
-    # Accept multiple keys for input
     input_value = str(
         data.get("input")
         or data.get("niche")
@@ -243,8 +248,7 @@ def build_pack():
 
     db = SessionLocal()
     try:
-        # Backlog guard (reject only if queue is truly huge)
-        backlog_cap = int(getattr(settings, "MAX_QUEUE_BACKLOG", 30) or 30)
+        backlog_cap = int(getattr(settings, "MAX_QUEUE_BACKLOG", 60) or 60)
         queued = db.query(Job).filter(Job.status == "queued").count()
         if queued >= backlog_cap:
             return jsonify({"error": "busy", "queued": queued, "backlog_cap": backlog_cap}), 429
@@ -260,16 +264,12 @@ def build_pack():
         job = Job(status="queued", progress=0.0, request=payload)
         db.add(job)
         db.commit()
-
         job_id = job.id
-
     finally:
         db.close()
 
     if sync:
-        # Process immediately (debug / demo)
         result = process_build_pack(job_id)
-        # Return pack if done
         db2 = SessionLocal()
         try:
             j = db2.get(Job, job_id)
@@ -289,14 +289,12 @@ def build_pack():
         finally:
             db2.close()
 
-    # Async path: kick scheduler (NEVER reject as busy)
     _kick_scheduler(max_to_start=2)
     return jsonify({"ok": True, "job_id": job_id, "status": "queued", "ts": _now().isoformat() + "Z"}), 202
 
 
 @app.get("/v1/jobs/<job_id>")
 def job_status(job_id: str):
-    # Opportunistically start more jobs while UI is polling
     _kick_scheduler(max_to_start=1)
 
     db = SessionLocal()
@@ -319,25 +317,6 @@ def job_status(job_id: str):
         })
     finally:
         db.close()
-
-
-def p_to_dict(p: Optional[Pack]) -> Optional[Dict[str, Any]]:
-    if not p:
-        return None
-    return {
-        "id": p.id,
-        "mode": p.mode,
-        "input_value": p.input_value,
-        "language": p.language,
-        "platforms": p.platforms,
-        "tone": p.tone,
-        "genes": p.genes,
-        "assets": p.assets,
-        "visual": p.visual,
-        "dominance": p.dominance,
-        "sources": p.sources,
-        "created_at": p.created_at.isoformat() + "Z" if p.created_at else None,
-    }
 
 
 @app.get("/v1/packs/<pack_id>")
