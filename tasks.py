@@ -1,30 +1,192 @@
 # tasks.py
 from __future__ import annotations
 
-import hashlib
 import json
+import os
 import re
-import traceback
+import time
 import uuid
-from datetime import datetime
-from typing import Any, Dict, List
+import hashlib
+import traceback
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional, Tuple
 
-from db import SessionLocal
-from models import Job, Pack, Score
+from sqlalchemy import create_engine, MetaData, Table, select, insert, update, text
+from sqlalchemy.engine import Engine
 
 
 # -------------------------------
-# Utilities
+# Lazy DB / Reflection utilities
 # -------------------------------
 
-_AR_STOP = {
-    "في", "من", "على", "إلى", "عن", "هذا", "هذه", "ذلك", "تلك", "مع", "ثم", "و", "او", "أو",
-    "the", "a", "an", "to", "of", "and", "or", "for", "in",
-}
+_ENGINE: Optional[Engine] = None
+_META: Optional[MetaData] = None
+_TBL_JOBS: Optional[Table] = None
+_TBL_PACKS: Optional[Table] = None
 
 
-def _now() -> datetime:
-    return datetime.utcnow()
+def _utc_now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _normalize_db_url(url: str) -> str:
+    if url.startswith("postgres://"):
+        return "postgresql://" + url[len("postgres://") :]
+    return url
+
+
+def _get_engine() -> Engine:
+    global _ENGINE
+    if _ENGINE is not None:
+        return _ENGINE
+
+    db_url = os.environ.get("DATABASE_URL", "").strip()
+    if not db_url:
+        raise RuntimeError("DATABASE_URL is not set")
+
+    db_url = _normalize_db_url(db_url)
+    _ENGINE = create_engine(
+        db_url,
+        pool_pre_ping=True,
+        pool_size=int(os.environ.get("DB_POOL_SIZE", "3")),
+        max_overflow=int(os.environ.get("DB_MAX_OVERFLOW", "2")),
+        future=True,
+    )
+    return _ENGINE
+
+
+def _reflect_tables() -> Tuple[Table, Table]:
+    global _META, _TBL_JOBS, _TBL_PACKS
+    if _TBL_JOBS is not None and _TBL_PACKS is not None:
+        return _TBL_JOBS, _TBL_PACKS
+
+    engine = _get_engine()
+    meta = MetaData()
+    meta.reflect(bind=engine)
+    _META = meta
+
+    names = set(meta.tables.keys())
+
+    def pick_table(candidates: List[str], contains: List[str]) -> Optional[str]:
+        for c in candidates:
+            if c in names:
+                return c
+        for n in names:
+            low = n.lower()
+            if any(k in low for k in contains):
+                return n
+        return None
+
+    jobs_name = pick_table(
+        candidates=["jobs", "job", "dominator_jobs", "ai_jobs"],
+        contains=["job"],
+    )
+    packs_name = pick_table(
+        candidates=["packs", "pack", "dominator_packs", "ai_packs"],
+        contains=["pack"],
+    )
+
+    if not jobs_name or not packs_name:
+        raise RuntimeError(f"Could not locate jobs/packs tables. Found tables: {sorted(names)[:50]}")
+
+    _TBL_JOBS = meta.tables[jobs_name]
+    _TBL_PACKS = meta.tables[packs_name]
+    return _TBL_JOBS, _TBL_PACKS
+
+
+def _col(table: Table, *names: str) -> Optional[str]:
+    cols = {c.name.lower(): c.name for c in table.columns}
+    for n in names:
+        if n.lower() in cols:
+            return cols[n.lower()]
+    return None
+
+
+def _json_assign(table: Table, col_name: str, obj: Any) -> Any:
+    col = table.columns[col_name]
+    tname = col.type.__class__.__name__.lower()
+    if "json" in tname:
+        return obj
+    return json.dumps(obj, ensure_ascii=False)
+
+
+_UUID_RE_DASH = re.compile(r"^[0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{12}$")
+_UUID_RE_HEX = re.compile(r"^[0-9a-fA-F]{32}$")
+
+
+def _is_uuid_col(col) -> bool:
+    t = str(col.type).lower()
+    cname = col.type.__class__.__name__.lower()
+    return ("uuid" in t) or ("uuid" in cname)
+
+
+def _key_candidates(raw_value: Any, id_col) -> List[Any]:
+    """
+    Generate safe candidates that match the *actual column type*.
+    - If column is UUID -> return UUID objects (when parseable).
+    - If column is TEXT/VARCHAR -> return strings (and try dashed/hex variants).
+    """
+    s = str(raw_value or "").strip()
+    out: List[Any] = []
+
+    if not s:
+        return out
+
+    if _is_uuid_col(id_col):
+        # UUID column: prefer UUID objects
+        try:
+            out.append(uuid.UUID(s))
+        except Exception:
+            # if it's not parseable, still try raw string (postgres may cast)
+            out.append(s)
+        return out
+
+    # VARCHAR/TEXT column: NEVER bind as UUID
+    out.append(s)
+
+    # If it looks like UUID dashed, also try hex-without-dashes
+    if _UUID_RE_DASH.match(s):
+        out.append(s.replace("-", ""))
+
+    # If it looks like 32 hex, also try dashed UUID string
+    if _UUID_RE_HEX.match(s):
+        try:
+            out.append(str(uuid.UUID(s)))
+        except Exception:
+            pass
+
+    # De-dup preserve order
+    uniq: List[Any] = []
+    for x in out:
+        if x not in uniq:
+            uniq.append(x)
+    return uniq
+
+
+def _find_row_by_id(conn, table: Table, id_col_name: str, raw_id: Any) -> Tuple[Optional[Dict[str, Any]], Any]:
+    """
+    Try multiple candidate formats for the given id until a row is found.
+    Returns (row_mapping_or_none, matched_key_used).
+    """
+    id_col = table.c[id_col_name]
+    cands = _key_candidates(raw_id, id_col)
+    for key in cands:
+        row = conn.execute(select(table).where(id_col == key)).mappings().first()
+        if row:
+            return row, key
+    return None, (cands[0] if cands else raw_id)
+
+
+# -------------------------------
+# Niche-Lock Content Engine
+# -------------------------------
+
+_AR_STOP = set(
+    [
+        "في","من","على","إلى","عن","هذا","هذه","ذلك","تلك","مع","ثم","و","او","أو",
+        "the","a","an","to","of","and","or","for","in",
+    ]
+)
 
 
 def _clean_text(s: str) -> str:
@@ -50,9 +212,8 @@ def _keywords(niche: str, limit: int = 8) -> List[str]:
     return out
 
 
-def _seed(niche: str, tone: str, lang: str, salt: str) -> int:
-    # IMPORTANT: include job_id salt so each job is unique (even same niche)
-    h = hashlib.sha256(f"{niche}|{tone}|{lang}|{salt}".encode("utf-8")).hexdigest()
+def _seed(niche: str, tone: str, lang: str) -> int:
+    h = hashlib.sha256(f"{niche}|{tone}|{lang}".encode("utf-8")).hexdigest()
     return int(h[:8], 16)
 
 
@@ -60,97 +221,85 @@ def _ensure_niche_lock(niche: str, payload: Dict[str, Any]) -> None:
     niche = _clean_text(niche)
     if not niche:
         raise RuntimeError("Niche is empty (cannot generate)")
-
-    blob = json.dumps(payload, ensure_ascii=False).lower()
-    # Accept if full niche appears or at least 3 keywords appear
-    if niche.lower() in blob:
-        return
-
-    kws = _keywords(niche, limit=3)
-    if not kws or not all(k.lower() in blob for k in kws):
-        raise RuntimeError("Niche-Lock failed: outputs do not reflect niche")
+    blob = json.dumps(payload, ensure_ascii=False)
+    if niche not in blob:
+        kws = _keywords(niche, limit=3)
+        if not kws or not all(k in blob.lower() for k in kws):
+            raise RuntimeError("Niche-Lock failed: outputs do not reflect niche")
 
 
-# -------------------------------
-# Content builders
-# -------------------------------
-
-def _build_linkedin(niche: str, kws: List[str], s: int) -> str:
+def _build_linkedin(niche: str, tone: str, lang: str, kws: List[str], s: int) -> str:
     niche = _clean_text(niche)
-
-    hooks = [
-        f"الخطأ الأكبر في {niche} ليس نقص الأدوات… بل اختيار «الإشارة» الخطأ.",
+    authority = "سلطة معرفية" if lang.startswith("ar") else "Authority"
+    hook_variants_ar = [
+        f"الخطأ الأكبر في {niche} ليس نقص الأدوات… بل اختيار الإشارة الخطأ.",
         f"إذا أردت نتائج حقيقية في {niche} خلال 14 يومًا: لا تطارد الترند… ابنِ نظام.",
         f"{niche}: 80% من الناس يعملون أكثر… ليحصلوا على أقل.",
         f"لن تكسب في {niche} لأنك أذكى… بل لأنك تقيس الشيء الصحيح.",
     ]
-    hook = hooks[s % len(hooks)]
-
-    bullets = [
+    hook = hook_variants_ar[s % len(hook_variants_ar)] if lang.startswith("ar") else f"{niche}: most people measure the wrong thing."
+    bullets_ar = [
         "1) حدّد «عميلًا واحدًا» بدقة (ليس جمهورًا).",
         "2) اختر «عرضًا واحدًا» يمكن قياسه (قبل التوسع).",
         "3) اصنع سلسلة محتوى تقود لنقطة قرار واحدة.",
         "4) اجعل كل منشور يلتقط بيانات (سؤال/تصويت/CTA).",
     ]
+    cta_ar = "سؤال مباشر: ما الجزء الأصعب لديك الآن؟ (المنتج / التسويق / التحويل / الاستمرارية)"
+    hashtags = " ".join([f"#{k}" for k in kws[:5]])
+    return "\n".join(
+        [
+            hook,
+            "",
+            f"الهدف هنا: تحويل {niche} إلى {authority} قابلة للتكرار.",
+            "",
+            *bullets_ar,
+            "",
+            "قاعدة ذهبية:",
+            f"إذا لم تستطع شرح {niche} في جملة واحدة تُقنع شخصًا مشغولًا… فأنت لم تُصمّم الرسالة بعد.",
+            "",
+            cta_ar,
+            "",
+            hashtags,
+        ]
+    )
 
-    hashtags = " ".join([f"#{k}" for k in kws[:6]])
-    return "\n".join([
-        hook,
-        "",
-        f"الهدف: تحويل {niche} إلى سلطة معرفية قابلة للتكرار.",
-        "",
-        *bullets,
-        "",
-        "قاعدة ذهبية:",
-        f"إذا لم تستطع شرح {niche} في جملة واحدة تُقنع شخصًا مشغولًا… فأنت لم تُصمّم الرسالة بعد.",
-        "",
-        "سؤال سريع: ما الجزء الأصعب لديك الآن؟ (المنتج / التسويق / التحويل / الاستمرارية)",
-        "",
-        hashtags,
-    ])
 
-
-def _build_x(niche: str, kws: List[str], s: int) -> str:
+def _build_x(niche: str, tone: str, lang: str, kws: List[str], s: int) -> str:
     niche = _clean_text(niche)
-
-    tweets = [
+    tweet_ar = [
         f"{niche}: لا تحتاج خطة معقدة… تحتاج «مقياس واحد» يمنعك من خداع نفسك.",
         f"أسرع طريقة للفشل في {niche}: تشتغل كثير وتراقب صفر مؤشرات.",
         f"في {niche}… المنافس الحقيقي ليس منافسك، بل تشتتك.",
     ]
-    tweet = tweets[s % len(tweets)]
-
+    tweet = tweet_ar[s % len(tweet_ar)]
     thread = [
         "Thread 🧵",
-        "1) اكتب الهدف بصيغة رقم + مدة (مثال: 30 طلب خلال 21 يوم).",
+        f"1) اكتب الهدف بصيغة رقم + مدة (مثال: 30 طلب خلال 21 يوم).",
         "2) اختر قناة واحدة فقط لمدة أسبوعين.",
         "3) ابنِ 3 رسائل: (ألم / حل / إثبات).",
         "4) كرّر نفس الرسائل بطرق مختلفة بدل تبديل كل شيء.",
         f"5) راقب: (CTR / Replies / Saves). هذه إشارات أن {niche} بدأ يلتقط.",
         "إذا تريد، اكتب هدفك هنا وسأعيد صياغته كنظام قابل للتنفيذ.",
     ]
-
-    hashtags = " ".join([f"#{k}" for k in kws[:5]])
+    hashtags = " ".join([f"#{k}" for k in kws[:4]])
     return "\n".join([tweet, "", *thread, "", hashtags])
 
 
-def _build_tiktok(niche: str, s: int) -> str:
+def _build_tiktok(niche: str, tone: str, lang: str, kws: List[str], s: int) -> str:
     niche = _clean_text(niche)
-
     hooks = [
         f"إذا كنت داخل {niche} وتقول «الموضوع ما يمشي»… اسمع هذا.",
         f"3 أشياء تمنعك تكسب من {niche}… حتى لو أنت شاطر.",
         f"سر صغير: {niche} ليس لعبة ترند… هو لعبة نظام.",
     ]
     hook = hooks[s % len(hooks)]
-
     script = [
         f"Hook: {hook}",
-        "مشهد 1 (2ث): نص كبير على الشاشة: «السبب الحقيقي للفشل»",
-        f"مشهد 2 (5ث): «أنت تحاول تعظيم كل شيء بدل تعظيم خطوة واحدة داخل {niche}»",
-        "مشهد 3 (7ث): إطار 3 خطوات: (عرض واضح) -> (رسالة واحدة) -> (CTA واحد)",
-        "مشهد 4 (6ث): مثال سريع جدًا (قبل/بعد) + إثبات بسيط",
-        "Outro (3ث): «اكتب كلمتك المفتاحية وسأرسل لك قالب التنفيذ»",
+        "مشهد 1 (2 ثواني): نص كبير على الشاشة: «السبب الحقيقي للفشل»",
+        f"مشهد 2 (5 ثواني): اشرح: «أنت تحاول تعظيم كل شيء بدل تعظيم خطوة واحدة داخل {niche}»",
+        "مشهد 3 (7 ثواني): قدّم إطار 3 خطوات: (عرض واضح) -> (رسالة واحدة) -> (CTA واحد)",
+        "مشهد 4 (6 ثواني): مثال سريع جدًا (قبل/بعد) + إثبات بسيط",
+        "Outro (3 ثواني): «اكتب كلمتك المفتاحية وسأرسل لك قالب التنفيذ»",
         "",
         "B-roll مقترح:",
         "- لقطات شاشة / كتابة على ورق / لوحة تحكم / نتائج قبل وبعد",
@@ -158,7 +307,7 @@ def _build_tiktok(niche: str, s: int) -> str:
     return "\n".join(script)
 
 
-def _build_visual_prompt(niche: str) -> str:
+def _build_visual_prompt(niche: str, lang: str) -> str:
     niche = _clean_text(niche)
     return (
         "Ultra-realistic cinematic professional photo, "
@@ -169,46 +318,71 @@ def _build_visual_prompt(niche: str) -> str:
     )
 
 
-def _dominance_score(niche: str, platforms: List[str], tone: str, kws: List[str]) -> Dict[str, Any]:
-    # Provide UI-friendly fields: score + reasons + recommendation
-    score = 62
+def _dominance_score(niche: str, platforms: List[str], tone: str) -> Dict[str, Any]:
+    kws = _keywords(niche)
+    base = 60
     if len(kws) >= 4:
-        score += 10
-    if len(platforms) >= 2:
-        score += 6
-    if tone.strip().lower() in ("authority", "سيادي", "سلطوي"):
-        score += 6
-    score = min(95, score)
-
-    reasons = [
-        "Niche-Lock: مضبوط",
-        "CTA: موجود",
-        f"Cross-platform: {len(platforms)}",
-    ]
-    recommendation = "publish" if score >= 80 else "revise"
-
+        base += 10
+    if "tiktok" in [p.lower() for p in platforms]:
+        base += 5
+    if tone.lower() in ["authority", "سلطوي", "سيادي"]:
+        base += 5
+    base = min(95, base)
     return {
-        "score": score,
-        "reasons": reasons,
-        "recommendation": recommendation,
+        "score": base,
+        "signals": [
+            "Niche-Lock: مضمون",
+            "CTA: موجود",
+            "Cross-platform: مفعّل" if len(platforms) >= 2 else "منصة واحدة",
+        ],
+        "risk": "منخفض" if base >= 75 else "متوسط",
     }
 
 
-def _make_pack_payload(job_id: str, niche: str, lang: str, tone: str, platforms: List[str]) -> Dict[str, Any]:
+def _pack_markdown(
+    niche: str,
+    assets: Dict[str, Any],
+    genes: Dict[str, Any],
+    dominance: Dict[str, Any],
+    visual: Dict[str, Any],
+) -> str:
+    parts = [
+        f"# Dominance Pack",
+        f"**Niche:** {niche}",
+        "",
+        "## Genes",
+        "```json",
+        json.dumps(genes, ensure_ascii=False, indent=2),
+        "```",
+        "",
+        "## Dominance Score",
+        "```json",
+        json.dumps(dominance, ensure_ascii=False, indent=2),
+        "```",
+        "",
+        "## Visual Prompt",
+        "```text",
+        (visual or {}).get("prompt", ""),
+        "```",
+        "",
+    ]
+    for k, v in assets.items():
+        parts.extend([f"## {k.upper()}", "```text", str(v), "```", ""])
+    return "\n".join(parts)
+
+
+def _make_pack_payload(niche: str, lang: str, tone: str, platforms: List[str]) -> Dict[str, Any]:
     niche = _clean_text(niche)
     kws = _keywords(niche)
-    s = _seed(niche, tone, lang, salt=job_id)
+    s = _seed(niche, tone, lang)
 
     assets: Dict[str, Any] = {}
-    pl = [p.strip() for p in platforms if str(p).strip()]
-    pl_low = [p.lower() for p in pl]
-
-    if "linkedin" in pl_low:
-        assets["linkedin"] = _build_linkedin(niche, kws, s)
-    if "x" in pl_low:
-        assets["x"] = _build_x(niche, kws, s + 13)
-    if "tiktok" in pl_low:
-        assets["tiktok"] = _build_tiktok(niche, s + 29)
+    if "linkedin" in [p.lower() for p in platforms]:
+        assets["linkedin"] = _build_linkedin(niche, tone, lang, kws, s)
+    if "x" in [p.lower() for p in platforms]:
+        assets["x"] = _build_x(niche, tone, lang, kws, s + 13)
+    if "tiktok" in [p.lower() for p in platforms]:
+        assets["tiktok"] = _build_tiktok(niche, tone, lang, kws, s + 29)
 
     genes = {
         "niche": niche,
@@ -219,18 +393,19 @@ def _make_pack_payload(job_id: str, niche: str, lang: str, tone: str, platforms:
         "language": lang,
     }
 
-    dominance = _dominance_score(niche, pl, tone, kws)
-    visual = {"prompt": _build_visual_prompt(niche)}
+    dominance = _dominance_score(niche, platforms, tone)
+    visual = {"prompt": _build_visual_prompt(niche, lang)}
 
     payload = {
         "ok": True,
         "niche": niche,
-        "platforms": pl,
+        "platforms": platforms,
         "genes": genes,
         "dominance": dominance,
         "visual": visual,
         "assets": assets,
-        "ts": _now().isoformat() + "Z",
+        "pack_markdown": _pack_markdown(niche, assets, genes, dominance, visual),
+        "ts": _utc_now_iso(),
     }
 
     _ensure_niche_lock(niche, payload)
@@ -238,135 +413,212 @@ def _make_pack_payload(job_id: str, niche: str, lang: str, tone: str, platforms:
 
 
 # -------------------------------
-# Public API expected by app.py
+# Public API expected by app.py / worker
 # -------------------------------
 
 def process_build_pack(job_id: str) -> Dict[str, Any]:
     """
-    Final, type-safe implementation:
-    - Job.id is String(32) => NEVER cast to UUID
-    - Store Pack using ORM (consistent schema)
-    - Always exit running state (done/failed)
+    Fixed: handles varchar(uuid-hex) ids WITHOUT casting to UUID.
+    Also: marks job failed on any exception (no more stuck "running").
     """
-    db = SessionLocal()
-    try:
-        job = db.get(Job, job_id)
-        if not job:
+    jobs, packs = _reflect_tables()
+    engine = _get_engine()
+
+    jobs_id_col = _col(jobs, "id", "job_id")
+    if not jobs_id_col:
+        raise RuntimeError("Jobs table has no id column")
+
+    status_col = _col(jobs, "status", "state")
+    updated_at_col = _col(jobs, "updated_at", "updatedAt", "ts_updated")
+    req_col = _col(jobs, "request", "request_json", "payload", "params", "input")
+    mode_col = _col(jobs, "mode")
+    input_col = _col(jobs, "input_value", "niche", "topic", "value", "query", "prompt")
+    lang_col = _col(jobs, "language", "lang")
+    tone_col = _col(jobs, "tone", "voice")
+    platforms_col = _col(jobs, "platforms")
+
+    result_col = _col(jobs, "result", "result_json", "output", "response")
+    error_col = _col(jobs, "error", "error_message", "last_error")
+    error_trace_col = _col(jobs, "error_trace", "trace", "errorStack")
+
+    pack_id_in_jobs_col = _col(jobs, "pack_id", "packId")
+
+    # 1) Locate job row with correct key format
+    with engine.begin() as conn:
+        row, job_key = _find_row_by_id(conn, jobs, jobs_id_col, job_id)
+        if not row:
             raise RuntimeError(f"Job not found: {job_id}")
 
-        # If already finished, return quickly
-        if job.status in ("done", "failed"):
-            return {"ok": True, "job_id": job.id, "status": job.status, "pack_id": job.pack_id}
+    niche = ""
+    pack_id_value = None
 
-        # Mark running
-        job.status = "running"
-        job.progress = max(job.progress or 0.0, 0.05)
-        if not job.started_at:
-            job.started_at = _now()
-        db.commit()
+    try:
+        with engine.begin() as conn:
+            # mark processing
+            if status_col:
+                conn.execute(
+                    update(jobs)
+                    .where(jobs.c[jobs_id_col] == job_key)
+                    .values(
+                        {
+                            status_col: "processing",
+                            **({updated_at_col: _utc_now_iso()} if updated_at_col else {}),
+                        }
+                    )
+                )
 
-        req = job.request or {}
-        mode = str(req.get("mode") or "niche").strip()
-        niche = _clean_text(str(req.get("input") or req.get("niche") or req.get("topic") or req.get("value") or ""))
+            # build request dict
+            req: Dict[str, Any] = {}
+            if req_col and row.get(req_col) is not None:
+                raw = row.get(req_col)
+                if isinstance(raw, (dict, list)):
+                    req = raw if isinstance(raw, dict) else {"payload": raw}
+                else:
+                    try:
+                        req = json.loads(raw)
+                    except Exception:
+                        req = {"raw": str(raw)}
 
-        lang = str(req.get("language") or req.get("lang") or "ar").strip()
-        tone = str(req.get("tone") or "Authority").strip()
+            mode = (req.get("mode") or (row.get(mode_col) if mode_col else None) or "niche").strip()
+            niche = (
+                req.get("input")
+                or req.get("niche")
+                or req.get("topic")
+                or (row.get(input_col) if input_col else None)
+                or ""
+            )
+            niche = _clean_text(str(niche))
 
-        platforms_val = req.get("platforms") or ["TikTok", "X", "LinkedIn"]
-        if isinstance(platforms_val, str):
-            platforms = [p.strip() for p in platforms_val.split(",") if p.strip()]
-        elif isinstance(platforms_val, list):
-            platforms = [str(p) for p in platforms_val]
-        else:
-            platforms = ["TikTok", "X", "LinkedIn"]
+            lang = (req.get("language") or req.get("lang") or (row.get(lang_col) if lang_col else None) or "ar").strip()
+            tone = (req.get("tone") or (row.get(tone_col) if tone_col else None) or "Authority").strip()
 
-        payload = _make_pack_payload(job_id=job.id, niche=niche, lang=lang, tone=tone, platforms=platforms)
+            platforms_val = req.get("platforms") or (row.get(platforms_col) if platforms_col else None) or ["TikTok", "X", "LinkedIn"]
+            if isinstance(platforms_val, str):
+                platforms = [p.strip() for p in platforms_val.split(",") if p.strip()]
+            elif isinstance(platforms_val, list):
+                platforms = [str(p) for p in platforms_val]
+            else:
+                platforms = ["TikTok", "X", "LinkedIn"]
 
-        # Create pack
-        pack = Pack(
-            id=uuid.uuid4().hex,
-            mode=mode,
-            input_value=niche,
-            language=lang,
-            platforms=payload.get("platforms", platforms),
-            tone=tone,
-            genes=payload.get("genes", {}),
-            assets=payload.get("assets", {}),
-            visual=payload.get("visual", {}),
-            dominance=payload.get("dominance", {}),
-            sources=payload.get("sources", {}),
-        )
-        db.add(pack)
-        db.flush()
+            payload = _make_pack_payload(niche=niche, lang=lang, tone=tone, platforms=platforms)
 
-        # Attach and finish job
-        job.pack_id = pack.id
-        job.status = "done"
-        job.progress = 1.0
-        job.finished_at = _now()
-        job.error_message = None
-        job.error_trace = None
+            # insert pack row
+            packs_id_col = _col(packs, "id", "pack_id")
+            packs_job_id_col = _col(packs, "job_id", "jobId")
+            packs_created_col = _col(packs, "created_at", "createdAt", "ts_created")
+            packs_updated_col = _col(packs, "updated_at", "updatedAt", "ts_updated")
 
-        # Optional: persist score row
-        dom = payload.get("dominance") or {}
-        score_val = int(dom.get("score") or 0)
-        reasons = dom.get("reasons") if isinstance(dom.get("reasons"), list) else []
-        recommendation = str(dom.get("recommendation") or "revise")
+            if not packs_id_col:
+                raise RuntimeError("Packs table has no id column")
 
-        # Upsert score
-        existing = db.query(Score).filter(Score.job_id == job.id).one_or_none()
-        if existing:
-            existing.score = score_val
-            existing.reasons = reasons
-            existing.recommendation = recommendation
-        else:
-            db.add(Score(job_id=job.id, score=score_val, reasons=reasons, recommendation=recommendation, version="v12.9"))
+            pack_uuid = uuid.uuid4()
+            pack_id_value = pack_uuid if _is_uuid_col(packs.c[packs_id_col]) else pack_uuid.hex
 
-        db.commit()
-        return {"ok": True, "job_id": job.id, "status": job.status, "pack_id": job.pack_id, "niche": niche}
+            pack_row: Dict[str, Any] = {packs_id_col: pack_id_value}
+
+            if packs_job_id_col:
+                # coerce job_key to packs.job_id type correctly
+                if _is_uuid_col(packs.c[packs_job_id_col]):
+                    pack_row[packs_job_id_col] = uuid.UUID(str(job_key))
+                else:
+                    pack_row[packs_job_id_col] = str(job_key)
+
+            for cname, val in [
+                ("raw", payload.get("assets")),
+                ("assets", payload.get("assets")),
+                ("genes", payload.get("genes")),
+                ("dominance", payload.get("dominance")),
+                ("visual", payload.get("visual")),
+                ("pack_markdown", payload.get("pack_markdown")),
+                ("niche", payload.get("niche")),
+            ]:
+                c = _col(packs, cname, cname + "_json")
+                if c:
+                    pack_row[c] = _json_assign(packs, c, val)
+
+            if packs_created_col and packs_created_col not in pack_row:
+                pack_row[packs_created_col] = _utc_now_iso()
+            if packs_updated_col and packs_updated_col not in pack_row:
+                pack_row[packs_updated_col] = _utc_now_iso()
+
+            conn.execute(insert(packs).values(pack_row))
+
+            # update job as done
+            job_update: Dict[str, Any] = {}
+            if status_col:
+                job_update[status_col] = "done"
+            if updated_at_col:
+                job_update[updated_at_col] = _utc_now_iso()
+            if pack_id_in_jobs_col:
+                job_update[pack_id_in_jobs_col] = pack_id_value
+            if result_col:
+                job_update[result_col] = _json_assign(jobs, result_col, payload)
+            if error_col:
+                job_update[error_col] = None
+            if error_trace_col:
+                job_update[error_trace_col] = None
+
+            conn.execute(update(jobs).where(jobs.c[jobs_id_col] == job_key).values(job_update))
+
+        return {"ok": True, "job_id": str(job_key), "pack_id": str(pack_id_value), "niche": niche, "ts": _utc_now_iso()}
 
     except Exception as e:
-        # Hard fail-safe: never leave job running
+        # Mark job failed (no more stuck running)
+        err_msg = str(e)
+        err_trace = traceback.format_exc()
+
         try:
-            job = db.get(Job, job_id)
-            if job and job.status not in ("done", "failed"):
-                job.status = "failed"
-                job.progress = float(job.progress or 0.0)
-                job.finished_at = _now()
-                job.error_message = str(e)
-                job.error_trace = traceback.format_exc()
-                db.commit()
+            with engine.begin() as conn:
+                row2, job_key2 = _find_row_by_id(conn, jobs, jobs_id_col, job_id)
+                if row2:
+                    fail_update: Dict[str, Any] = {}
+                    if status_col:
+                        fail_update[status_col] = "failed"
+                    if updated_at_col:
+                        fail_update[updated_at_col] = _utc_now_iso()
+                    if error_col:
+                        fail_update[error_col] = err_msg
+                    if error_trace_col:
+                        fail_update[error_trace_col] = err_trace
+                    conn.execute(update(jobs).where(jobs.c[jobs_id_col] == job_key2).values(fail_update))
         except Exception:
             pass
-        return {"ok": False, "job_id": job_id, "error": str(e)}
-    finally:
-        db.close()
+
+        raise
 
 
 def worker_tick(limit: int = 1) -> Dict[str, Any]:
-    """
-    Workerless tick (GitHub Actions compatible):
-    process up to N queued jobs sequentially.
-    """
     limit = max(1, int(limit or 1))
-    db = SessionLocal()
-    started = _now()
-    processed: List[Dict[str, Any]] = []
+    jobs, _ = _reflect_tables()
+    engine = _get_engine()
 
-    try:
-        jobs = (
-            db.query(Job)
-            .filter(Job.status == "queued")
-            .order_by(Job.created_at.asc())
-            .limit(limit)
-            .all()
-        )
-        ids = [j.id for j in jobs]
-    finally:
-        db.close()
+    jobs_id_col = _col(jobs, "id", "job_id")
+    status_col = _col(jobs, "status", "state")
+    created_at_col = _col(jobs, "created_at", "createdAt", "ts_created")
+
+    if not jobs_id_col or not status_col:
+        raise RuntimeError("Jobs table missing id/status columns; cannot tick")
+
+    processed: List[Dict[str, Any]] = []
+    started = time.time()
+
+    with engine.begin() as conn:
+        q = select(jobs.c[jobs_id_col]).where(jobs.c[status_col] == "queued")
+        if created_at_col:
+            q = q.order_by(jobs.c[created_at_col].asc())
+        q = q.limit(limit)
+        ids = [str(r[0]) for r in conn.execute(q).fetchall()]
 
     for jid in ids:
-        processed.append(process_build_pack(jid))
+        try:
+            processed.append(process_build_pack(jid))
+        except Exception as e:
+            processed.append({"ok": False, "job_id": jid, "error": str(e)})
 
-    took_ms = int(((_now() - started).total_seconds()) * 1000)
-    return {"ok": True, "limit": limit, "processed": processed, "took_ms": took_ms, "ts": _now().isoformat() + "Z"}
+    return {
+        "ok": True,
+        "limit": limit,
+        "processed": processed,
+        "took_ms": int((time.time() - started) * 1000),
+        "ts": _utc_now_iso(),
+    }
