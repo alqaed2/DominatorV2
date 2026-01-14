@@ -6,10 +6,9 @@ import time
 import traceback
 from collections import defaultdict, deque
 from datetime import datetime, timedelta
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Union, List
 
 from flask import Flask, jsonify, request, render_template
-from sqlalchemy import text as sa_text
 
 from config import settings
 from db import init_db, SessionLocal, engine
@@ -65,8 +64,14 @@ def _rate_limit_ok(ip: str) -> (bool, int):
     return True, 0
 
 
+def _count_status(db, statuses: Union[str, List[str]]) -> int:
+    if isinstance(statuses, str):
+        return db.query(Job).filter(Job.status == statuses).count()
+    return db.query(Job).filter(Job.status.in_(list(statuses))).count()
+
+
 def _cleanup_stale_running(db) -> int:
-    # IMPORTANT: consider both "running" and "processing" as active states
+    # treat "processing" as running too (in case older tasks.py used it)
     stale_sec = max(180, int(getattr(settings, "MODEL_TIMEOUT_SEC", 45) or 45) * 3)
     cutoff = _now() - timedelta(seconds=stale_sec)
 
@@ -84,7 +89,6 @@ def _cleanup_stale_running(db) -> int:
             {
                 Job.status: "failed",
                 Job.error_message: f"stale_timeout>{stale_sec}s",
-                Job.error_trace: None,
                 Job.finished_at: _now(),
             },
             synchronize_session=False,
@@ -92,38 +96,29 @@ def _cleanup_stale_running(db) -> int:
     return n
 
 
-def _count_status(db, status: str) -> int:
-    return db.query(Job).filter(Job.status == status).count()
-
-
-def _count_active(db) -> int:
-    return db.query(Job).filter(Job.status.in_(["running", "processing"])).count()
-
-
-def _count_pending(db) -> Tuple[int, int, int]:
-    running = _count_active(db)
-    queued = _count_status(db, "queued")
-    failed = _count_status(db, "failed")
-    return running, queued, failed
+def _mark_job_failed(job_id: str, err: Exception) -> None:
+    db = SessionLocal()
+    try:
+        j = db.get(Job, job_id)
+        if j:
+            j.status = "failed"
+            j.error_message = str(err)
+            j.error_trace = traceback.format_exc(limit=25)
+            j.finished_at = _now()
+            j.progress = float(j.progress or 0.0)
+            db.commit()
+    finally:
+        db.close()
 
 
 def _spawn_job(job_id: str) -> None:
+    job_id = str(job_id)
+
     def _runner():
         try:
             process_build_pack(job_id)
         except Exception as e:
-            # Ensure we never leave jobs stuck in "running"
-            db = SessionLocal()
-            try:
-                j = db.get(Job, job_id)
-                if j and j.status in ("queued", "running", "processing"):
-                    j.status = "failed"
-                    j.error_message = str(e)
-                    j.error_trace = traceback.format_exc()
-                    j.finished_at = _now()
-                    db.commit()
-            finally:
-                db.close()
+            _mark_job_failed(job_id, e)
 
     t = threading.Thread(target=_runner, name=f"job-{job_id}", daemon=True)
     t.start()
@@ -135,7 +130,7 @@ def _kick_scheduler(max_to_start: int = 2) -> Dict[str, Any]:
         cleaned = _cleanup_stale_running(db)
         db.commit()
 
-        running = _count_active(db)
+        running = _count_status(db, ["running", "processing"])
         max_running = int(getattr(settings, "MAX_CONCURRENT_JOBS", 2) or 2)
         available = max(0, max_running - running)
         available = min(available, max(1, int(max_to_start or 1)))
@@ -145,16 +140,8 @@ def _kick_scheduler(max_to_start: int = 2) -> Dict[str, Any]:
 
         backlog_cap = int(getattr(settings, "MAX_QUEUE_BACKLOG", 60) or 60)
         queued = _count_status(db, "queued")
-        # Cap on queued only (backlog definition), but include diagnostics
-        if queued >= backlog_cap:
-            return {
-                "ok": True,
-                "cleaned": cleaned,
-                "started": 0,
-                "running": running,
-                "queued": queued,
-                "backlog_cap": backlog_cap,
-            }
+        if queued > backlog_cap:
+            return {"ok": True, "cleaned": cleaned, "started": 0, "running": running, "queued": queued, "backlog_cap": backlog_cap}
 
         jobs = (
             db.query(Job)
@@ -183,7 +170,7 @@ def _kick_scheduler(max_to_start: int = 2) -> Dict[str, Any]:
                 db.commit()
                 _spawn_job(j.id)
 
-        running2 = _count_active(db)
+        running2 = _count_status(db, ["running", "processing"])
         return {"ok": True, "cleaned": cleaned, "started": started, "running": running2}
     finally:
         db.close()
@@ -227,13 +214,11 @@ def readyz():
     err = None
     try:
         with engine.connect() as conn:
-            # SQLAlchemy 2.x requires executable text()
-            conn.execute(sa_text("SELECT 1"))
+            conn.exec_driver_sql("SELECT 1")
     except Exception as e:
         db_ok = False
         err = str(e)
     return jsonify({"ready": db_ok, "db_init": True, "db_init_err": err})
-
 
 # -------------------------------
 # API
@@ -271,7 +256,7 @@ def build_pack():
     ).strip()
 
     if not input_value:
-        return jsonify({"error": "bad_request", "message": "Missing input/niche"}), 400
+        return jsonify({"error": "bad_request", "messagemessage": "Missing input/niche"}), 400
 
     language = str(data.get("language") or data.get("lang") or "ar").strip()
     tone = str(data.get("tone") or "Authority").strip()
@@ -285,26 +270,10 @@ def build_pack():
 
     db = SessionLocal()
     try:
-        # proactive cleanup to avoid "busy" due to stale jobs
-        cleaned = _cleanup_stale_running(db)
-        db.commit()
-
         backlog_cap = int(getattr(settings, "MAX_QUEUE_BACKLOG", 60) or 60)
-        running, queued, failed = _count_pending(db)
-
-        # Prevent overload: cap total "queued" backlog (not active)
+        queued = db.query(Job).filter(Job.status == "queued").count()
         if queued >= backlog_cap:
-            return jsonify(
-                {
-                    "error": "busy",
-                    "reason": "queue_backlog_cap",
-                    "queued": queued,
-                    "running": running,
-                    "failed": failed,
-                    "backlog_cap": backlog_cap,
-                    "cleaned": cleaned,
-                }
-            ), 429
+            return jsonify({"error": "busy", "queued": queued, "backlog_cap": backlog_cap}), 429
 
         payload = {
             "mode": mode,
@@ -317,7 +286,7 @@ def build_pack():
         job = Job(status="queued", progress=0.0, request=payload)
         db.add(job)
         db.commit()
-        job_id = job.id
+        job_id = str(job.id)
     finally:
         db.close()
 
@@ -325,27 +294,24 @@ def build_pack():
         try:
             result = process_build_pack(job_id)
         except Exception as e:
-            return jsonify({"ok": False, "error": "job_failed", "message": str(e)}), 500
+            return jsonify({"ok": False, "error": str(e)}), 500
 
         db2 = SessionLocal()
         try:
             j = db2.get(Job, job_id)
             p = db2.get(Pack, j.pack_id) if (j and j.pack_id) else None
-            return jsonify(
-                {
-                    "ok": True,
-                    "job": {
-                        "id": j.id if j else job_id,
-                        "status": j.status if j else "unknown",
-                        "progress": float(j.progress or 0.0) if j else 0.0,
-                        "pack_id": j.pack_id if j else None,
-                        "error_message": j.error_message if j else None,
-                        "error_trace": j.error_trace if j else None,
-                    },
-                    "pack": p_to_dict(p) if p else None,
-                    "result": result,
-                }
-            )
+            return jsonify({
+                "ok": True,
+                "job": {
+                    "id": j.id if j else job_id,
+                    "status": j.status if j else "unknown",
+                    "progress": float(j.progress or 0.0) if j else 0.0,
+                    "pack_id": j.pack_id if j else None,
+                    "error_message": j.error_message if j else None,
+                },
+                "pack": p_to_dict(p) if p else None,
+                "result": result,
+            })
         finally:
             db2.close()
 
@@ -363,20 +329,18 @@ def job_status(job_id: str):
         if not job:
             return jsonify({"error": "not_found"}), 404
 
-        return jsonify(
-            {
-                "ok": True,
-                "job": {
-                    "id": job.id,
-                    "status": job.status,
-                    "progress": float(job.progress or 0.0),
-                    "pack_id": job.pack_id,
-                    "error_message": job.error_message,
-                    "error_trace": job.error_trace,
-                },
-                "ts": _now().isoformat() + "Z",
-            }
-        )
+        return jsonify({
+            "ok": True,
+            "job": {
+                "id": job.id,
+                "status": job.status,
+                "progress": float(job.progress or 0.0),
+                "pack_id": job.pack_id,
+                "error_message": job.error_message,
+                "error_trace": job.error_trace,
+            },
+            "ts": _now().isoformat() + "Z",
+        })
     finally:
         db.close()
 
@@ -414,10 +378,8 @@ def admin_cleanup():
     try:
         cleaned = _cleanup_stale_running(db)
         db.commit()
-        running = _count_active(db)
+        running = _count_status(db, ["running", "processing"])
         queued = _count_status(db, "queued")
-        return jsonify(
-            {"ok": True, "cleaned": cleaned, "running": running, "queued": queued, "ts": _now().isoformat() + "Z"}
-        )
+        return jsonify({"ok": True, "cleaned": cleaned, "running": running, "queued": queued, "ts": _now().isoformat() + "Z"})
     finally:
         db.close()
