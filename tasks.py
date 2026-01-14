@@ -11,8 +11,9 @@ import traceback
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
-from sqlalchemy import create_engine, MetaData, Table, select, insert, update, text
+from sqlalchemy import create_engine, MetaData, Table, select, insert, update
 from sqlalchemy.engine import Engine
+from sqlalchemy.sql.elements import BinaryExpression
 
 
 # -------------------------------
@@ -30,6 +31,7 @@ def _utc_now_iso() -> str:
 
 
 def _normalize_db_url(url: str) -> str:
+    # Render sometimes provides postgres:// which SQLAlchemy wants as postgresql://
     if url.startswith("postgres://"):
         return "postgresql://" + url[len("postgres://") :]
     return url
@@ -56,6 +58,9 @@ def _get_engine() -> Engine:
 
 
 def _reflect_tables() -> Tuple[Table, Table]:
+    """
+    Robustly locate jobs/packs tables even if names differ slightly.
+    """
     global _META, _TBL_JOBS, _TBL_PACKS
     if _TBL_JOBS is not None and _TBL_PACKS is not None:
         return _TBL_JOBS, _TBL_PACKS
@@ -102,79 +107,69 @@ def _col(table: Table, *names: str) -> Optional[str]:
     return None
 
 
+def _is_uuid_col(table: Table, col_name: str) -> bool:
+    try:
+        t = table.columns[col_name].type
+        tname = (t.__class__.__name__ or "").lower()
+        s = (str(t) or "").lower()
+        return ("uuid" in tname) or ("uuid" in s)
+    except Exception:
+        return False
+
+
+def _id_candidates(raw: str) -> List[str]:
+    raw = (raw or "").strip()
+    if not raw:
+        return []
+    compact = raw.replace("-", "")
+    if compact != raw:
+        return [raw, compact]
+    return [raw]
+
+
+def _where_job_id(jobs: Table, id_col: str, raw_job_id: str) -> BinaryExpression:
+    """
+    Build a WHERE that works for both UUID and VARCHAR ids,
+    and also accepts hyphenated/non-hyphenated UUID strings.
+    """
+    if _is_uuid_col(jobs, id_col):
+        # UUID column: use UUID if possible, else fall back to raw string (some drivers coerce)
+        try:
+            return jobs.c[id_col] == uuid.UUID(raw_job_id)
+        except Exception:
+            return jobs.c[id_col] == raw_job_id
+
+    # String column: match both raw and compact forms if different
+    cands = _id_candidates(raw_job_id)
+    if len(cands) == 1:
+        return jobs.c[id_col] == cands[0]
+    return jobs.c[id_col].in_(cands)
+
+
+def _coerce_for_col(table: Table, col_name: str, value: Any) -> Any:
+    """
+    Coerce an id value to match the target column type (UUID vs string).
+    """
+    if value is None:
+        return None
+    if _is_uuid_col(table, col_name):
+        try:
+            return uuid.UUID(str(value))
+        except Exception:
+            return value
+    # string-ish
+    return str(value)
+
+
 def _json_assign(table: Table, col_name: str, obj: Any) -> Any:
+    """
+    Store dict as native JSON if column type is JSON/JSONB, otherwise as string.
+    """
     col = table.columns[col_name]
     tname = col.type.__class__.__name__.lower()
     if "json" in tname:
         return obj
     return json.dumps(obj, ensure_ascii=False)
-
-
-_UUID_RE_DASH = re.compile(r"^[0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{12}$")
-_UUID_RE_HEX = re.compile(r"^[0-9a-fA-F]{32}$")
-
-
-def _is_uuid_col(col) -> bool:
-    t = str(col.type).lower()
-    cname = col.type.__class__.__name__.lower()
-    return ("uuid" in t) or ("uuid" in cname)
-
-
-def _key_candidates(raw_value: Any, id_col) -> List[Any]:
-    """
-    Generate safe candidates that match the *actual column type*.
-    - If column is UUID -> return UUID objects (when parseable).
-    - If column is TEXT/VARCHAR -> return strings (and try dashed/hex variants).
-    """
-    s = str(raw_value or "").strip()
-    out: List[Any] = []
-
-    if not s:
-        return out
-
-    if _is_uuid_col(id_col):
-        # UUID column: prefer UUID objects
-        try:
-            out.append(uuid.UUID(s))
-        except Exception:
-            # if it's not parseable, still try raw string (postgres may cast)
-            out.append(s)
-        return out
-
-    # VARCHAR/TEXT column: NEVER bind as UUID
-    out.append(s)
-
-    # If it looks like UUID dashed, also try hex-without-dashes
-    if _UUID_RE_DASH.match(s):
-        out.append(s.replace("-", ""))
-
-    # If it looks like 32 hex, also try dashed UUID string
-    if _UUID_RE_HEX.match(s):
-        try:
-            out.append(str(uuid.UUID(s)))
-        except Exception:
-            pass
-
-    # De-dup preserve order
-    uniq: List[Any] = []
-    for x in out:
-        if x not in uniq:
-            uniq.append(x)
-    return uniq
-
-
-def _find_row_by_id(conn, table: Table, id_col_name: str, raw_id: Any) -> Tuple[Optional[Dict[str, Any]], Any]:
-    """
-    Try multiple candidate formats for the given id until a row is found.
-    Returns (row_mapping_or_none, matched_key_used).
-    """
-    id_col = table.c[id_col_name]
-    cands = _key_candidates(raw_id, id_col)
-    for key in cands:
-        row = conn.execute(select(table).where(id_col == key)).mappings().first()
-        if row:
-            return row, key
-    return None, (cands[0] if cands else raw_id)
 
 
 # -------------------------------
@@ -183,8 +178,29 @@ def _find_row_by_id(conn, table: Table, id_col_name: str, raw_id: Any) -> Tuple[
 
 _AR_STOP = set(
     [
-        "في","من","على","إلى","عن","هذا","هذه","ذلك","تلك","مع","ثم","و","او","أو",
-        "the","a","an","to","of","and","or","for","in",
+        "في",
+        "من",
+        "على",
+        "إلى",
+        "عن",
+        "هذا",
+        "هذه",
+        "ذلك",
+        "تلك",
+        "مع",
+        "ثم",
+        "و",
+        "او",
+        "أو",
+        "the",
+        "a",
+        "an",
+        "to",
+        "of",
+        "and",
+        "or",
+        "for",
+        "in",
     ]
 )
 
@@ -274,7 +290,7 @@ def _build_x(niche: str, tone: str, lang: str, kws: List[str], s: int) -> str:
     tweet = tweet_ar[s % len(tweet_ar)]
     thread = [
         "Thread 🧵",
-        f"1) اكتب الهدف بصيغة رقم + مدة (مثال: 30 طلب خلال 21 يوم).",
+        "1) اكتب الهدف بصيغة رقم + مدة (مثال: 30 طلب خلال 21 يوم).",
         "2) اختر قناة واحدة فقط لمدة أسبوعين.",
         "3) ابنِ 3 رسائل: (ألم / حل / إثبات).",
         "4) كرّر نفس الرسائل بطرق مختلفة بدل تبديل كل شيء.",
@@ -347,7 +363,7 @@ def _pack_markdown(
     visual: Dict[str, Any],
 ) -> str:
     parts = [
-        f"# Dominance Pack",
+        "# Dominance Pack",
         f"**Niche:** {niche}",
         "",
         "## Genes",
@@ -418,8 +434,13 @@ def _make_pack_payload(niche: str, lang: str, tone: str, platforms: List[str]) -
 
 def process_build_pack(job_id: str) -> Dict[str, Any]:
     """
-    Fixed: handles varchar(uuid-hex) ids WITHOUT casting to UUID.
-    Also: marks job failed on any exception (no more stuck "running").
+    Robust processor:
+    - fetch job safely (UUID/VARCHAR compatible)
+    - mark running
+    - generate pack payload
+    - insert pack
+    - update job -> done
+    - on ANY error: update job -> failed (never leave it stuck)
     """
     jobs, packs = _reflect_tables()
     engine = _get_engine()
@@ -429,50 +450,71 @@ def process_build_pack(job_id: str) -> Dict[str, Any]:
         raise RuntimeError("Jobs table has no id column")
 
     status_col = _col(jobs, "status", "state")
+    progress_col = _col(jobs, "progress", "pct", "percent")
     updated_at_col = _col(jobs, "updated_at", "updatedAt", "ts_updated")
+    started_at_col = _col(jobs, "started_at", "startedAt")
+    finished_at_col = _col(jobs, "finished_at", "finishedAt")
     req_col = _col(jobs, "request", "request_json", "payload", "params", "input")
+    result_col = _col(jobs, "result", "result_json", "output", "response")
+    error_col = _col(jobs, "error", "error_message", "last_error")
+    error_trace_col = _col(jobs, "error_trace", "trace", "stack")
+    pack_id_in_jobs_col = _col(jobs, "pack_id", "packId")
+
+    # input columns fallbacks
     mode_col = _col(jobs, "mode")
     input_col = _col(jobs, "input_value", "niche", "topic", "value", "query", "prompt")
     lang_col = _col(jobs, "language", "lang")
     tone_col = _col(jobs, "tone", "voice")
     platforms_col = _col(jobs, "platforms")
 
-    result_col = _col(jobs, "result", "result_json", "output", "response")
-    error_col = _col(jobs, "error", "error_message", "last_error")
-    error_trace_col = _col(jobs, "error_trace", "trace", "errorStack")
-
-    pack_id_in_jobs_col = _col(jobs, "pack_id", "packId")
-
-    # 1) Locate job row with correct key format
-    with engine.begin() as conn:
-        row, job_key = _find_row_by_id(conn, jobs, jobs_id_col, job_id)
-        if not row:
-            raise RuntimeError(f"Job not found: {job_id}")
-
-    niche = ""
-    pack_id_value = None
+    def _fail_job(conn, job_where, msg: str, tr: str) -> None:
+        upd: Dict[str, Any] = {}
+        if status_col:
+            upd[status_col] = "failed"
+        if progress_col:
+            upd[progress_col] = 1.0
+        if updated_at_col:
+            upd[updated_at_col] = _utc_now_iso()
+        if finished_at_col:
+            upd[finished_at_col] = _utc_now_iso()
+        if error_col:
+            upd[error_col] = msg
+        if error_trace_col:
+            upd[error_trace_col] = tr
+        conn.execute(update(jobs).where(job_where).values(upd))
 
     try:
         with engine.begin() as conn:
-            # mark processing
-            if status_col:
-                conn.execute(
-                    update(jobs)
-                    .where(jobs.c[jobs_id_col] == job_key)
-                    .values(
-                        {
-                            status_col: "processing",
-                            **({updated_at_col: _utc_now_iso()} if updated_at_col else {}),
-                        }
-                    )
-                )
+            # 1) locate job row safely
+            where = _where_job_id(jobs, jobs_id_col, job_id)
+            row = conn.execute(select(jobs).where(where)).mappings().first()
+            if not row:
+                raise RuntimeError(f"Job not found: {job_id}")
 
-            # build request dict
+            job_pk = row.get(jobs_id_col)
+            job_where = (jobs.c[jobs_id_col] == job_pk)
+
+            # 2) mark running (do NOT switch to a new state name; keep it simple)
+            running_upd: Dict[str, Any] = {}
+            if status_col:
+                running_upd[status_col] = "running"
+            if started_at_col and not row.get(started_at_col):
+                running_upd[started_at_col] = _utc_now_iso()
+            if progress_col:
+                running_upd[progress_col] = 0.10
+            if updated_at_col:
+                running_upd[updated_at_col] = _utc_now_iso()
+            if running_upd:
+                conn.execute(update(jobs).where(job_where).values(running_upd))
+
+            # 3) parse request
             req: Dict[str, Any] = {}
             if req_col and row.get(req_col) is not None:
                 raw = row.get(req_col)
-                if isinstance(raw, (dict, list)):
-                    req = raw if isinstance(raw, dict) else {"payload": raw}
+                if isinstance(raw, dict):
+                    req = raw
+                elif isinstance(raw, (list, tuple)):
+                    req = {"payload": raw}
                 else:
                     try:
                         req = json.loads(raw)
@@ -500,29 +542,26 @@ def process_build_pack(job_id: str) -> Dict[str, Any]:
             else:
                 platforms = ["TikTok", "X", "LinkedIn"]
 
+            # 4) generate payload (strict niche-lock)
             payload = _make_pack_payload(niche=niche, lang=lang, tone=tone, platforms=platforms)
 
-            # insert pack row
+            # 5) insert pack
             packs_id_col = _col(packs, "id", "pack_id")
+            if not packs_id_col:
+                raise RuntimeError("Packs table has no id column")
+
             packs_job_id_col = _col(packs, "job_id", "jobId")
             packs_created_col = _col(packs, "created_at", "createdAt", "ts_created")
             packs_updated_col = _col(packs, "updated_at", "updatedAt", "ts_updated")
 
-            if not packs_id_col:
-                raise RuntimeError("Packs table has no id column")
-
             pack_uuid = uuid.uuid4()
-            pack_id_value = pack_uuid if _is_uuid_col(packs.c[packs_id_col]) else pack_uuid.hex
+            pack_id_value = pack_uuid if _is_uuid_col(packs, packs_id_col) else pack_uuid.hex
 
             pack_row: Dict[str, Any] = {packs_id_col: pack_id_value}
-
             if packs_job_id_col:
-                # coerce job_key to packs.job_id type correctly
-                if _is_uuid_col(packs.c[packs_job_id_col]):
-                    pack_row[packs_job_id_col] = uuid.UUID(str(job_key))
-                else:
-                    pack_row[packs_job_id_col] = str(job_key)
+                pack_row[packs_job_id_col] = _coerce_for_col(packs, packs_job_id_col, job_pk)
 
+            # store common fields if columns exist
             for cname, val in [
                 ("raw", payload.get("assets")),
                 ("assets", payload.get("assets")),
@@ -531,10 +570,18 @@ def process_build_pack(job_id: str) -> Dict[str, Any]:
                 ("visual", payload.get("visual")),
                 ("pack_markdown", payload.get("pack_markdown")),
                 ("niche", payload.get("niche")),
+                ("mode", mode),
+                ("input_value", niche),
+                ("language", lang),
+                ("tone", tone),
+                ("platforms", platforms),
             ]:
                 c = _col(packs, cname, cname + "_json")
                 if c:
-                    pack_row[c] = _json_assign(packs, c, val)
+                    if isinstance(val, (dict, list)):
+                        pack_row[c] = _json_assign(packs, c, val)
+                    else:
+                        pack_row[c] = val
 
             if packs_created_col and packs_created_col not in pack_row:
                 pack_row[packs_created_col] = _utc_now_iso()
@@ -543,14 +590,18 @@ def process_build_pack(job_id: str) -> Dict[str, Any]:
 
             conn.execute(insert(packs).values(pack_row))
 
-            # update job as done
+            # 6) update job -> done
             job_update: Dict[str, Any] = {}
             if status_col:
                 job_update[status_col] = "done"
+            if progress_col:
+                job_update[progress_col] = 1.0
             if updated_at_col:
                 job_update[updated_at_col] = _utc_now_iso()
+            if finished_at_col:
+                job_update[finished_at_col] = _utc_now_iso()
             if pack_id_in_jobs_col:
-                job_update[pack_id_in_jobs_col] = pack_id_value
+                job_update[pack_id_in_jobs_col] = _coerce_for_col(jobs, pack_id_in_jobs_col, pack_id_value)
             if result_col:
                 job_update[result_col] = _json_assign(jobs, result_col, payload)
             if error_col:
@@ -558,36 +609,32 @@ def process_build_pack(job_id: str) -> Dict[str, Any]:
             if error_trace_col:
                 job_update[error_trace_col] = None
 
-            conn.execute(update(jobs).where(jobs.c[jobs_id_col] == job_key).values(job_update))
+            conn.execute(update(jobs).where(job_where).values(job_update))
 
-        return {"ok": True, "job_id": str(job_key), "pack_id": str(pack_id_value), "niche": niche, "ts": _utc_now_iso()}
+            return {"ok": True, "job_id": str(job_pk), "pack_id": str(pack_id_value), "niche": niche, "ts": _utc_now_iso()}
 
     except Exception as e:
-        # Mark job failed (no more stuck running)
-        err_msg = str(e)
-        err_trace = traceback.format_exc()
-
+        # best-effort: mark failed so nothing stays stuck
         try:
             with engine.begin() as conn:
-                row2, job_key2 = _find_row_by_id(conn, jobs, jobs_id_col, job_id)
-                if row2:
-                    fail_update: Dict[str, Any] = {}
-                    if status_col:
-                        fail_update[status_col] = "failed"
-                    if updated_at_col:
-                        fail_update[updated_at_col] = _utc_now_iso()
-                    if error_col:
-                        fail_update[error_col] = err_msg
-                    if error_trace_col:
-                        fail_update[error_trace_col] = err_trace
-                    conn.execute(update(jobs).where(jobs.c[jobs_id_col] == job_key2).values(fail_update))
+                where = _where_job_id(jobs, jobs_id_col, job_id)
+                row = conn.execute(select(jobs).where(where)).mappings().first()
+                if row:
+                    job_pk = row.get(jobs_id_col)
+                    job_where = (jobs.c[jobs_id_col] == job_pk)
+                    _fail_job(conn, job_where, str(e), traceback.format_exc())
         except Exception:
             pass
-
         raise
 
 
 def worker_tick(limit: int = 1) -> Dict[str, Any]:
+    """
+    Process up to N queued jobs.
+    Safer behavior:
+      - claim jobs by updating status from queued->running (prevents double work)
+      - then process each job
+    """
     limit = max(1, int(limit or 1))
     jobs, _ = _reflect_tables()
     engine = _get_engine()
@@ -595,6 +642,9 @@ def worker_tick(limit: int = 1) -> Dict[str, Any]:
     jobs_id_col = _col(jobs, "id", "job_id")
     status_col = _col(jobs, "status", "state")
     created_at_col = _col(jobs, "created_at", "createdAt", "ts_created")
+    started_at_col = _col(jobs, "started_at", "startedAt")
+    updated_at_col = _col(jobs, "updated_at", "updatedAt", "ts_updated")
+    progress_col = _col(jobs, "progress", "pct", "percent")
 
     if not jobs_id_col or not status_col:
         raise RuntimeError("Jobs table missing id/status columns; cannot tick")
@@ -602,18 +652,40 @@ def worker_tick(limit: int = 1) -> Dict[str, Any]:
     processed: List[Dict[str, Any]] = []
     started = time.time()
 
+    # 1) read candidates
     with engine.begin() as conn:
         q = select(jobs.c[jobs_id_col]).where(jobs.c[status_col] == "queued")
         if created_at_col:
             q = q.order_by(jobs.c[created_at_col].asc())
         q = q.limit(limit)
-        ids = [str(r[0]) for r in conn.execute(q).fetchall()]
+        cand_ids = [r[0] for r in conn.execute(q).fetchall()]
 
-    for jid in ids:
+    # 2) claim + process
+    for raw_id in cand_ids:
+        # claim atomically
+        claimed = False
+        with engine.begin() as conn:
+            where = (jobs.c[jobs_id_col] == raw_id) & (jobs.c[status_col] == "queued")
+            upd: Dict[str, Any] = {status_col: "running"}
+            if started_at_col:
+                upd[started_at_col] = _utc_now_iso()
+            if updated_at_col:
+                upd[updated_at_col] = _utc_now_iso()
+            if progress_col:
+                upd[progress_col] = 0.05
+            res = conn.execute(update(jobs).where(where).values(upd))
+            try:
+                claimed = (res.rowcount or 0) > 0
+            except Exception:
+                claimed = True  # some drivers may not provide rowcount reliably
+
+        if not claimed:
+            continue
+
         try:
-            processed.append(process_build_pack(jid))
+            processed.append(process_build_pack(str(raw_id)))
         except Exception as e:
-            processed.append({"ok": False, "job_id": jid, "error": str(e)})
+            processed.append({"ok": False, "job_id": str(raw_id), "error": str(e)})
 
     return {
         "ok": True,
