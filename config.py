@@ -1,65 +1,79 @@
+# config.py
+from __future__ import annotations
 import os
+from typing import Optional
 
 
-def _getenv(key: str, default: str | None = None) -> str | None:
-    val = os.getenv(key)
-    if val is None or val == "":
-        return default
-    return val
+def _read_secret_file(name: str) -> Optional[str]:
+    """
+    Render Secret Files are mounted at /etc/secrets/<FILENAME>
+    """
+    path = f"/etc/secrets/{name}"
+    try:
+        if os.path.exists(path):
+            v = open(path, "r", encoding="utf-8").read().strip()
+            return v or None
+    except Exception:
+        return None
+    return None
 
 
-def _getint(key: str, default: int) -> int:
-    v = _getenv(key)
+def _getenv(name: str, default: Optional[str] = None) -> Optional[str]:
+    v = os.environ.get(name, None)
+    if v is not None and str(v).strip() != "":
+        return str(v).strip()
+    return default
+
+
+def _getsecret(name: str, default: Optional[str] = None) -> Optional[str]:
+    """
+    Read from Environment Variables first, then Secret Files.
+    """
+    v = _getenv(name, None)
+    if v:
+        return v
+    sf = _read_secret_file(name)
+    if sf:
+        return sf
+    return default
+
+
+def _getint(name: str, default: int) -> int:
+    v = _getenv(name)
     try:
         return int(v) if v is not None else default
     except Exception:
         return default
 
 
-def _getbool(key: str, default: bool) -> bool:
-    v = _getenv(key)
+def _getbool(name: str, default: bool = False) -> bool:
+    v = _getenv(name)
     if v is None:
         return default
-    return v.strip().lower() in ("1", "true", "yes", "y", "on")
+    return str(v).strip().lower() in ("1", "true", "yes", "on")
 
 
 class Settings:
-    # Core runtime
-    LOG_LEVEL: str = _getenv("LOG_LEVEL", "INFO") or "INFO"
+    # Core
+    ASYNC_ENABLED = _getbool("ASYNC_ENABLED", True)
+    LOG_LEVEL = _getenv("LOG_LEVEL", "INFO") or "INFO"
 
-    # Database
-    DATABASE_URL: str = _getenv("DATABASE_URL", "sqlite:///./local.db") or "sqlite:///./local.db"
+    # Limits
+    MAX_CONCURRENT_JOBS = _getint("MAX_CONCURRENT_JOBS", 1)
+    MAX_QUEUE_BACKLOG = _getint("MAX_QUEUE_BACKLOG", 60)
+    MAX_REQUESTS_PER_IP_PER_MIN = _getint("MAX_REQUESTS_PER_IP_PER_MIN", 60)
+    MODEL_TIMEOUT_SEC = _getint("MODEL_TIMEOUT_SEC", 60)
 
-    # Queue / Worker
-    REDIS_URL: str | None = _getenv("REDIS_URL")
-    QUEUE_NAME: str = _getenv("QUEUE_NAME", "dominator") or "dominator"
+    # Worker tick
+    WORKER_TICK_TOKEN = _getsecret("WORKER_TICK_TOKEN", "")
 
-    # Async mode:
-    # - If True and REDIS+Worker exists -> enqueue
-    # - If True and NO Worker -> remain queued and processed by /internal/worker-tick
-    ASYNC_ENABLED: bool = _getbool("ASYNC_ENABLED", True)
+    # Gemini
+    GEMINI_API_KEY = _getsecret("GEMINI_API_KEY", "")
+    GEMINI_MODEL = _getenv("GEMINI_MODEL", "gemini-flash-latest") or "gemini-flash-latest"
 
-    # Workerless tick security (REQUIRED for free mode)
-    WORKER_TICK_TOKEN: str | None = _getenv("WORKER_TICK_TOKEN")
-
-    # Load guards
-    MAX_CONCURRENT_JOBS: int = _getint("MAX_CONCURRENT_JOBS", 2)   # running only
-    MAX_QUEUE_BACKLOG: int = _getint("MAX_QUEUE_BACKLOG", 30)      # queued backlog cap
-    MAX_REQUESTS_PER_IP_PER_MIN: int = _getint("MAX_REQUESTS_PER_IP_PER_MIN", 30)
-
-    # Model routing
-    GEMINI_API_KEY: str | None = _getenv("GEMINI_API_KEY") or _getenv("GOOGLE_API_KEY")
-    GEMINI_MODEL: str = _getenv("GEMINI_MODEL", "gemini-2.0-flash") or "gemini-2.0-flash"
-    NEBULA_MODELS: str = _getenv(
-        "NEBULA_MODELS",
-        "gemini-2.5-flash,gemini-2.0-flash,gemini-1.5-flash,gemini-1.5-pro",
-    ) or "gemini-2.5-flash,gemini-2.0-flash,gemini-1.5-flash,gemini-1.5-pro"
-    MODEL_TIMEOUT_SEC: int = _getint("MODEL_TIMEOUT_SEC", 45)
-
-    # Trends
-    TRENDS_PROVIDER: str = _getenv("TRENDS_PROVIDER", "mock") or "mock"
-    APIFY_TOKEN: str | None = _getenv("APIFY_TOKEN")
-    APIFY_TRENDS_ENDPOINT: str | None = _getenv("APIFY_TRENDS_ENDPOINT")
+    # Optional Apify
+    APIFY_API_KEY = _getsecret("APIFY_API_KEY", "")
+    APIFY_TOKEN = _getsecret("APIFY_TOKEN", "")
 
 
 settings = Settings()
