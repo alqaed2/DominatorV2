@@ -1,42 +1,46 @@
+# models.py
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
-from sqlalchemy import String, DateTime, Float, Integer, Text, ForeignKey, Index
-from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.types import JSON
-from db import Base
+from datetime import datetime, timezone
+from typing import Any, Dict, Optional
+
+from sqlalchemy import DateTime, Float, ForeignKey, String, Text, Index
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+
+try:
+    from sqlalchemy.dialects.postgresql import JSONB as _JSON
+except Exception:
+    from sqlalchemy import JSON as _JSON  # type: ignore
 
 
-def _now() -> datetime:
-    return datetime.utcnow()
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+class Base(DeclarativeBase):
+    pass
 
 
 class Job(Base):
     __tablename__ = "jobs"
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=lambda: uuid.uuid4().hex)
-    status: Mapped[str] = mapped_column(String(20), default="queued", index=True)  # queued|running|failed|done
-    progress: Mapped[float] = mapped_column(Float, default=0.0)
+    status: Mapped[str] = mapped_column(String(16), index=True, default="queued", nullable=False)
+    progress: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
 
-    request: Mapped[dict] = mapped_column(JSON, default=dict)
-    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
-    error_trace: Mapped[str | None] = mapped_column(Text, nullable=True)
+    request: Mapped[Dict[str, Any]] = mapped_column(_JSON, default=dict, nullable=False)
 
-    pack_id: Mapped[str | None] = mapped_column(String(32), ForeignKey("packs.id"), nullable=True)
+    pack_id: Mapped[Optional[str]] = mapped_column(String(32), ForeignKey("packs.id"), nullable=True)
+    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    error_trace: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
-    started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, onupdate=_utcnow, nullable=False)
+    started_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    pack = relationship("Pack", back_populates="job", lazy="joined")
-    events = relationship("Event", back_populates="job", cascade="all, delete-orphan")
-    score = relationship("Score", back_populates="job", uselist=False, cascade="all, delete-orphan")
-
-    __table_args__ = (
-        Index("ix_jobs_status_created_at", "status", "created_at"),
-    )
+    pack: Mapped[Optional["Pack"]] = relationship("Pack", back_populates="job", foreign_keys=[pack_id], uselist=False)
 
 
 class Pack(Base):
@@ -44,50 +48,24 @@ class Pack(Base):
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=lambda: uuid.uuid4().hex)
 
-    mode: Mapped[str] = mapped_column(String(10), default="niche")  # niche|url
-    input_value: Mapped[str] = mapped_column(Text, default="")
+    job_id: Mapped[Optional[str]] = mapped_column(String(32), ForeignKey("jobs.id"), index=True, nullable=True)
 
-    language: Mapped[str] = mapped_column(String(10), default="ar")
-    platforms: Mapped[list] = mapped_column(JSON, default=list)
-    tone: Mapped[str] = mapped_column(String(50), default="authority")
+    mode: Mapped[str] = mapped_column(String(32), default="niche", nullable=False)
+    input_value: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    language: Mapped[str] = mapped_column(String(16), default="ar", nullable=False)
+    tone: Mapped[str] = mapped_column(String(32), default="Authority", nullable=False)
+    platforms: Mapped[Dict[str, Any]] = mapped_column(_JSON, default=list, nullable=False)
 
-    genes: Mapped[dict] = mapped_column(JSON, default=dict)
-    assets: Mapped[dict] = mapped_column(JSON, default=dict)
-    visual: Mapped[dict] = mapped_column(JSON, default=dict)
+    genes: Mapped[Dict[str, Any]] = mapped_column(_JSON, default=dict, nullable=False)
+    assets: Mapped[Dict[str, Any]] = mapped_column(_JSON, default=dict, nullable=False)
+    visual: Mapped[Dict[str, Any]] = mapped_column(_JSON, default=dict, nullable=False)
+    dominance: Mapped[Dict[str, Any]] = mapped_column(_JSON, default=dict, nullable=False)
+    sources: Mapped[Dict[str, Any]] = mapped_column(_JSON, default=dict, nullable=False)
 
-    dominance: Mapped[dict] = mapped_column(JSON, default=dict)
-    sources: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, onupdate=_utcnow, nullable=False)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
-
-    job = relationship("Job", back_populates="pack", uselist=False)
-
-
-class Event(Base):
-    __tablename__ = "events"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    job_id: Mapped[str] = mapped_column(String(32), ForeignKey("jobs.id"), index=True)
-
-    type: Mapped[str] = mapped_column(String(50), index=True)
-    payload: Mapped[dict] = mapped_column(JSON, default=dict)
-
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
-
-    job = relationship("Job", back_populates="events")
+    job: Mapped[Optional[Job]] = relationship("Job", back_populates="pack", foreign_keys=[job_id], uselist=False)
 
 
-class Score(Base):
-    __tablename__ = "scores"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    job_id: Mapped[str] = mapped_column(String(32), ForeignKey("jobs.id"), unique=True)
-
-    score: Mapped[int] = mapped_column(Integer, default=0)
-    reasons: Mapped[list] = mapped_column(JSON, default=list)
-    recommendation: Mapped[str] = mapped_column(String(30), default="revise")  # publish|revise|regenerate
-    version: Mapped[str] = mapped_column(String(20), default="v1")
-
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
-
-    job = relationship("Job", back_populates="score")
+Index("ix_packs_job_id", Pack.job_id)
